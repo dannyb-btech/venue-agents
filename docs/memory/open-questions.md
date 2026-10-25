@@ -21,6 +21,9 @@ Questions for the founders/partners. Answer inline with date; turn decisions int
       Re-check at P0-08 (weekly releases). Core GA is ADR-0004's revisit trigger: review it before P0-08.
 - [ ] Does `AnthropicFoundryClient` support Entra ID / managed identity, and can it target an APIM URL
       (or do we use `AnthropicClient(base_url=...)`)? Learn documents API keys only. Check at P0-08.
+- [ ] Learn now documents a `microsoft-opentelemetry` distro (`use_microsoft_opentelemetry`) that looks
+      like the successor to `azure-monitor-opentelemetry` (pinned 1.8.11 in P0-02). Check its maturity
+      before P0-11; the swap is isolated in `va_core.telemetry._configure_azure_monitor`.
 - [ ] Do Foundry Agent Service prompt agents support Claude? (Not relied on; confirm before P3-07.)
 - [ ] Azure subscription for the project: pay-as-you-go (Claude on Foundry requires a paid subscription,
       not free trial, credit-only or CSP).

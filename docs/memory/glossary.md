@@ -10,6 +10,8 @@
 | Tenant catalog | Global DB mapping venue → stamp, plan, entitlements. |
 | Agent | A role (Events Manager, Wine Buyer, Office Manager, ...) built with Agent Framework. |
 | Agent run | One durable orchestration of an agent for one venue. |
+| TenantContext | `va_core.tenancy`: tenant, venue, stamp, user and roles, resolved once at the edge; never from input. |
+| Tenant scope | `tenant_scope(ctx)`: sets the current tenant for telemetry; switching tenant inside one raises. |
 | Connector | MCP server for one external system; read + draft tools only. |
 | Draft | A proposed action (email, order, roster, payment link) awaiting approval. |
 | Approval | A recorded decision on a draft by an authorised user (approve, edit, reject). |

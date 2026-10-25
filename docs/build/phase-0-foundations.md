@@ -13,12 +13,16 @@ Gate 1: OR data flowing (read-only) into the canary stamp.
     (Service Bus opt-in profile), CI workflow. Checks pass locally and on a fresh clone; CI green pending
     first push to GitHub; compose not started (Docker Desktop was off).
 
-- [ ] **P0-02 Core package: tenancy, settings, telemetry, secrets, errors** — deps: P0-01 — docs: security.md
+- [x] **P0-02 Core package: tenancy, settings, telemetry, secrets, errors** — deps: P0-01 — docs: security.md
   - `packages/core`: `TenantContext` (tenant_id, venue_id, stamp_id, user/role), context propagation,
     pydantic-settings, OpenTelemetry setup with venue_id/run_id on every span and log, redaction helpers,
     secrets interface (Key Vault impl + local `.env` impl), typed errors, HTTP client with
     timeouts/retries/Retry-After.
   - Accept: unit tests for context propagation, redaction, retry behaviour; no `os.environ` outside settings.
+  - Done 2026-10-25: `va_core` tenancy (contextvars, fail-closed, no context change inside a scope), settings
+    (ENVIRONMENT required), redaction + handler log filter, OTel/Azure Monitor setup, Key Vault/.env secrets
+    with `TenantSecrets`, typed errors, retrying HTTP client (no blind re-send; `outcome_unknown`). 96 tests
+    incl. an `os.environ` guard; security review findings H1–H3 fixed, rest tracked in progress.md.
 
 - [ ] **P0-03 Stamp database + RLS** — deps: P0-02 — docs: data-model.md, ADR-0007, ADR-0008
   - `packages/db`: SQLAlchemy models + Alembic for platform tables (tenant, venue, app_user,

@@ -8,8 +8,9 @@ members = ["apps/*", "apps/connectors/*", "packages/*"]
 exclude = ["apps/connectors", "apps/venue-app"]
 
 [tool.uv]
-# Agent Framework's Anthropic and durable packages are prerelease: allow betas only where pinned.
-prerelease = "explicit"
+# Agent Framework's Anthropic and durable packages are prerelease: allow a beta only where no stable
+# release satisfies the requirement (exact beta pins, OpenTelemetry semconv/instrumentations, Azure Monitor exporter).
+prerelease = "if-necessary"
 
 [dependency-groups]
 dev = [
@@ -29,7 +30,8 @@ extend-exclude = ["apps/venue-app"]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "S"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S101"]
+# Tests use fake credentials on purpose; gitleaks still scans them for real ones.
+"**/tests/**" = ["S101", "S105", "S106"]
 # Claude Code hooks run fixed local tools (uv/ruff) on paths from Claude Code itself.
 ".claude/hooks/**" = ["S603", "S607"]
 
