@@ -11,7 +11,8 @@
 - **Local services:** `docker compose up -d` — Postgres (pgvector 0.8.7; `va_app` + `va_app_local` from
   init.sql, volume recreated 2026-10-25), Azurite, DTS emulator v0.0.9 (dashboard http://localhost:8082).
   DB tests need `DATABASE_ADMIN_URL` (127.0.0.1, not localhost) in `.env`.
-- **CI:** GitHub repo `dannyb-btech/venue-agents`; CI green on `dev` (all 5 jobs) as of 2026-10-25
+- **CI:** GitHub repo `dannyb-btech/venue-agents`; CI green on `dev` (all 5 jobs) at P0-03 `487ff4e`, 2026-10-25;
+  the isolation job runs tests/isolation + packages/db on Postgres (147 passed)
 - **Environment:** Windows, VS Code + Claude Code, uv 0.13.5 (Python 3.12.15), pnpm, Docker Desktop.
   Norton Web Shield intercepts HTTPS: see lessons.md
 - **Branches:** `main` (scaffold) and `dev` (work); humans merge to `main` and push
@@ -29,7 +30,7 @@
 - Verified: ruff, format, pyright strict 0 errors, pytest 253 passed / 4 expected skips, isolation 143
   passed, local alembic up/down/up, gitleaks; mutation checks confirmed the reset, guard and FORCE-RLS tests bite.
 - security-reviewer: fixed M1–M5, L1–L5; H1 (per-service roles) and H2 (approval payload hash + draft
-  immutability) scheduled as P0-08/P0-09 prerequisites in the phase file. CI DB job not yet run on GitHub.
+  immutability) scheduled as P0-08/P0-09 prerequisites in the phase file. CI green on GitHub (all 5 jobs).
 
 ### 2026-10-25 — P0-02 Core package
 - `va_core`: `TenantContext` + `tenant_scope`/`run_scope` (contextvars; fail closed; any context change
