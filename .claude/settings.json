@@ -1,0 +1,56 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv sync *)",
+      "Bash(uv run pytest *)",
+      "Bash(uv run ruff *)",
+      "Bash(uv run pyright *)",
+      "Bash(uv run alembic *)",
+      "Bash(uv add *)",
+      "Bash(pnpm --dir apps/venue-app *)",
+      "Bash(docker compose *)",
+      "Bash(az bicep build *)",
+      "Bash(az bicep lint *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "mcp__microsoft-learn"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(az *)",
+      "Bash(azd *)",
+      "mcp__azure"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.*.local)",
+      "Read(./.env.dev*)",
+      "Read(./.env.prod*)",
+      "Read(./.env.stag*)",
+      "Read(./.env.test*)",
+      "Bash(azd up *)",
+      "Bash(azd provision *)",
+      "Bash(azd deploy *)",
+      "Bash(az deployment *)",
+      "Bash(az group delete *)",
+      "Bash(git push --force *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/format_python.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
