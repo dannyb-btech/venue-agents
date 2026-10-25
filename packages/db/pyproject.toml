@@ -3,7 +3,13 @@ name = "va-db"
 version = "0.1.0"
 description = "SQLAlchemy models, Alembic migrations and row-level security policies."
 requires-python = ">=3.12,<3.13"
-dependencies = ["va-core"]
+dependencies = [
+    "alembic==1.20.1",
+    "pgvector==0.5.1",
+    "psycopg[binary]==3.3.6",
+    "sqlalchemy[asyncio]==2.1.6",
+    "va-core",
+]
 
 [build-system]
 requires = ["uv_build>=0.13,<0.14"]

@@ -25,6 +25,12 @@ Questions for the founders/partners. Answer inline with date; turn decisions int
       like the successor to `azure-monitor-opentelemetry` (pinned 1.8.11 in P0-02). Check its maturity
       before P0-11; the swap is isolated in `va_core.telemetry._configure_azure_monitor`.
 - [ ] Do Foundry Agent Service prompt agents support Claude? (Not relied on; confirm before P3-07.)
+- [ ] Embedding model for `chunk.embedding` (sets the vector dimension + HNSW index; needs an ADR:
+      new vendor/data flow, residency under ADR-0002). P0-03 left the column dimensionless. Decide
+      before the first retrieval feature (Events Manager past proposals/menus).
+- [ ] Azure Postgres runtime login: map each app's managed identity to a `va_app` member role
+      (Entra auth on flexible server). Design in P0-11. Per-service roles are now a P0-08 prerequisite
+      (security review H1): the Entra mapping should target those roles, not a shared `va_app`.
 - [ ] Azure subscription for the project: pay-as-you-go (Claude on Foundry requires a paid subscription,
       not free trial, credit-only or CSP).
 

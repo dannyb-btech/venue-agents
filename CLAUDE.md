@@ -54,7 +54,8 @@ prompts/               session kickoff prompts for each build step
 
 - Install: `uv sync` · Hooks (once per clone): `uv run pre-commit install` (ruff + gitleaks)
 - Lint: `uv run ruff check . && uv run ruff format --check .` · Types: `uv run pyright`
-- Tests: `uv run pytest` · Isolation: `uv run pytest tests/isolation`
+- Tests: `uv run pytest` · Isolation: `uv run pytest tests/isolation` (DB tests need Postgres up and
+  `DATABASE_ADMIN_URL` set; they fail, not skip, without it)
 - Local services: `docker compose up -d` (Postgres + pgvector, Azurite, Durable Task Scheduler emulator,
   dashboard http://localhost:8082). Service Bus emulator is opt-in (~2 GB): `docker compose --profile servicebus up -d`
 - Migrations (from P0-03): `uv run alembic -c packages/db/alembic.ini upgrade head`

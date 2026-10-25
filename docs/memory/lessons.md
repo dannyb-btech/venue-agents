@@ -3,6 +3,24 @@
 Things that cost time: library quirks, API gotchas, environment issues. Newest first.
 Format: date — area — what happened — what to do instead.
 
+- 2026-10-25 — Postgres on Windows — `localhost:5432` hung forever in psycopg (`alembic upgrade` sat in
+  `wait_conn`): `localhost` tries `::1` first and compose publishes on `127.0.0.1` only; with a
+  connect timeout it falls back after the timeout. Use `127.0.0.1` in URLs and always set
+  `connect_timeout` (`DATABASE_CONNECT_TIMEOUT`).
+- 2026-10-25 — psycopg async on Windows — needs a selector event loop, not the default Proactor.
+  pytest-asyncio 1.4 deprecates overriding `event_loop_policy`; implement the
+  `pytest_asyncio_loop_factories(config, item)` hook (returns `{name: factory}`), see tests/isolation/conftest.py.
+- 2026-10-25 — RLS — Postgres checks the RLS WITH CHECK before NOT NULL, so an insert with no tenant
+  fails with "violates row-level security policy", not "null value". Superusers (the compose/CI `app`
+  login) bypass RLS even with FORCE: never run app code or RLS assertions as the admin login.
+- 2026-10-25 — Postgres GUCs — a session-level `SET`/`set_config(..., false)` made in a transaction that is
+  rolled back is reverted too. A "leak through the pool" test must commit the setting first, or it passes
+  without any reset. Also: psycopg (non-autocommit) opens a transaction for `RESET ALL` in a pool `reset`
+  hook — commit afterwards or the next checkout fails with "connection in transaction status INTRANS".
+- 2026-10-25 — SQLAlchemy 2.1 — `commit()` inside `async with session.begin():` raises
+  "Can't operate on closed transaction inside context manager". `tenant_session` manages commit/rollback
+  itself and re-sets the tenant in an `after_begin` listener so mid-block commits are safe.
+
 - 2026-10-25 — Docker Compose — DTS emulator `v0.0.10` (latest) crashes on start with "Scheduler name is not
   set", even with the documented `docker run`; pinned `v0.0.9`. Re-test newer tags before bumping.
 - 2026-10-25 — Postgres init scripts — `.sql` files in `docker-entrypoint-initdb.d` don't get `POSTGRES_DB`

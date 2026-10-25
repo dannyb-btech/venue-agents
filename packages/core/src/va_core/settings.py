@@ -44,8 +44,11 @@ class CoreSettings(BaseSettings):
     service_name: str = "venue-agents"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
+    # Runtime connections log in as a member of `va_app` (no BYPASSRLS). The schema owner's URL
+    # (DATABASE_ADMIN_URL) is deliberately not here: only `va_db.settings.MigrationSettings` has it.
     database_url: SecretStr | None = None
     catalog_database_url: SecretStr | None = None
+    database_connect_timeout: int = Field(default=10, gt=0)
 
     model_gateway_url: HttpUrl | None = None
     model_gateway_key: SecretStr | None = None

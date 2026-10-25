@@ -50,8 +50,11 @@ exclude = ["apps/venue-app", "**/node_modules", "**/__pycache__", ".venv"]
 [tool.pytest.ini_options]
 testpaths = ["apps", "packages", "tests"]
 addopts = ["--import-mode=importlib", "--strict-markers", "-ra"]
+# Repo root on sys.path so tests/isolation can share helper modules (`tests.isolation.*`).
+pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
-    "isolation: cross-tenant isolation tests (must always pass)",
+    "isolation: cross-tenant isolation tests (must always pass; need Postgres)",
+    "db: tests that need Postgres (migrations)",
 ]

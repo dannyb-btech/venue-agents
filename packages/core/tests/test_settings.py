@@ -45,6 +45,17 @@ def test_deployed_environment_requires_key_vault_and_identity(
     assert not settings.environment.is_local
 
 
+def test_database_url_is_secret_and_admin_url_is_not_loaded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://va_app_local:pw-runtime@db/stamp")
+    monkeypatch.setenv("DATABASE_ADMIN_URL", "postgresql+psycopg://app:pw-admin@db/stamp")
+    settings = CoreSettings.load()
+    assert settings.database_url is not None
+    assert "pw-runtime" not in repr(settings)
+    assert not hasattr(settings, "database_admin_url")
+
+
 def test_empty_values_in_env_file_mean_unset(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text(
         "KEY_VAULT_URL=\nMANAGED_IDENTITY_CLIENT_ID=\nAPPLICATIONINSIGHTS_CONNECTION_STRING=\n",

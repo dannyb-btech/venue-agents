@@ -49,9 +49,10 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: uv sync --locked
-      - run: uv run pytest -q -m "not isolation"
+      - run: uv run pytest -q -m "not isolation and not db"
 
-  # Cross-tenant isolation tests: must always pass. Postgres is ready for P0-03's RLS tests.
+  # Cross-tenant isolation tests (must always pass) and migration tests, against real Postgres.
+  # Each run creates its own database and a throwaway va_app login; `app` is only the admin.
   isolation:
     runs-on: ubuntu-latest
     services:
@@ -66,7 +67,8 @@ jobs:
           --health-cmd "pg_isready -U app -d venue_agents"
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      DATABASE_URL: postgresql+psycopg://app:app@localhost:5432/venue_agents
+      ENVIRONMENT: test
+      DATABASE_ADMIN_URL: postgresql+psycopg://app:app@127.0.0.1:5432/venue_agents
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.2  # setup-uv publishes no floating major tags after v7
@@ -74,7 +76,7 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: uv sync --locked
-      - run: uv run pytest tests/isolation -q -m isolation
+      - run: uv run pytest tests/isolation packages/db -q -m "isolation or db"
 
   secret-scan:
     runs-on: ubuntu-latest

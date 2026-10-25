@@ -43,5 +43,29 @@ secret_ref), `agent_config` (targets e.g. labour %, wine GP, approval rules, sch
 
 ## Conventions
 
-- Primary keys `(tenant_id, id)`, ids are UUIDv7. Timestamps `timestamptz` UTC.
+- Primary keys `(tenant_id, id)` (`tenant` itself: `tenant_id`), ids are UUIDv7. Timestamps `timestamptz` UTC.
+- Every FK is composite `(tenant_id, x_id) → parent(tenant_id, id)`; venue-scoped tables carry `venue_id`.
 - Indexes start with `tenant_id`. Money as `numeric(12,2)` with currency column (AUD default).
+  Exception: `usage_cost.cost` is `numeric(14,6)` (per-call model cost is sub-cent); round when reporting.
+- `chunk.embedding` is `vector` with no dimension and no HNSW index until the embedding model is chosen
+  (ADR then; open-questions.md).
+
+## Isolation mechanics (P0-03)
+
+- RLS enabled **and forced** on every table; policy `tenant_isolation`:
+  `tenant_id = va_current_tenant()` for USING and WITH CHECK. `va_current_tenant()` reads the
+  transaction-local `app.tenant_id`; unset → NULL → no rows, every write rejected (fail closed).
+- `tenant_id` defaults to `va_current_tenant()`, so code never passes it.
+- Roles: the migration/admin login owns the schema (locally a superuser, so it bypasses RLS — never used
+  by runtime code). Runtime logins are members of `va_app` (NOLOGIN, NOBYPASSRLS, owns nothing).
+  `tenant` is SELECT-only (lifecycle is the control plane's); `tool_call`, `approval`, `usage_cost` are
+  append-only; `action_log` has no DELETE. The admin URL lives only in `va_db.settings.MigrationSettings`.
+- Code uses `va_db.session.tenant_session(sessionmaker, ctx)` on an engine from `create_engine` /
+  `create_runtime_engine`: the tenant is set at the start of every transaction, connections `RESET ALL`
+  on return to the pool, and a statement guard rejects anything else touching `app.tenant_id`,
+  `set_config`, roles, `search_path`, `RESET` or `DISCARD`. Services must call
+  `assert_rls_enforced(engine)` at start-up (refuses logins that can reach a superuser/BYPASSRLS role,
+  own tables, or aren't `va_app` members).
+- `va_current_tenant()` is `BEGIN ATOMIC` with schema-qualified names (bound at creation).
+- Follow-ups before P0-08/P0-09: per-service roles (H1) and approval-to-content binding (H2); see the
+  phase-0 task list.

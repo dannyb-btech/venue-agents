@@ -24,7 +24,7 @@ Gate 1: OR data flowing (read-only) into the canary stamp.
     with `TenantSecrets`, typed errors, retrying HTTP client (no blind re-send; `outcome_unknown`). 96 tests
     incl. an `os.environ` guard; security review findings H1–H3 fixed, rest tracked in progress.md.
 
-- [ ] **P0-03 Stamp database + RLS** — deps: P0-02 — docs: data-model.md, ADR-0007, ADR-0008
+- [x] **P0-03 Stamp database + RLS** — deps: P0-02 — docs: data-model.md, ADR-0007, ADR-0008
   - `packages/db`: SQLAlchemy models + Alembic for platform tables (tenant, venue, app_user,
     role_assignment, connection, agent_config) and agent-activity tables (agent_run, tool_call, draft,
     approval, action_log, usage_cost), `sync_cursor`, `document`/`chunk` (pgvector).
@@ -32,6 +32,10 @@ Gate 1: OR data flowing (read-only) into the canary stamp.
     Session helper that sets the tenant from `TenantContext`.
   - Accept: `tests/isolation/` proves tenant A can't read/write tenant B for every table, and queries fail
     closed without the tenant set; migrations upgrade/downgrade cleanly.
+  - Done 2026-10-25: 15 tables in migrations 0001–0005 (forced RLS, composite keys/FKs, `va_app` role,
+    append-only audit tables, `tenant` SELECT-only); `tenant_session` + hardened runtime engine (pool
+    `RESET ALL`, statement guard, `assert_rls_enforced`). 143 isolation tests (per-table behaviour +
+    catalog meta-tests) and migration round-trip/model-drift tests. Security review H1/H2 scheduled on P0-08/P0-09.
 
 - [ ] **P0-04 Control plane + tenant catalog** — deps: P0-03 — docs: scale-plan.md, ADR-0008
   - `apps/control-plane`: catalog DB (venue_directory, stamp, entitlement, onboarding_job), `GET /route`,
@@ -62,11 +66,17 @@ Gate 1: OR data flowing (read-only) into the canary stamp.
     Run logging: agent_run, tool_call, usage_cost.
   - Accept: end-to-end local test (with a mocked model client) passes; one manual run against a Foundry dev
     deployment documented in lessons.md; orchestration survives a worker restart mid-wait.
+  - **Prereq (P0-03 security review H1):** per-service DB roles (`va_api`, `va_agent`, `va_executor`,
+    `va_sync`) replacing the shared `va_app`, with an ADR and a per-role privilege-matrix test. The agent
+    runtime must not be able to write `approval`, `role_assignment` or `action_log`.
 
 - [ ] **P0-09 Action executor** — deps: P0-08 — docs: ADR-0005, ADR-0006
   - Consumes approval events; dispatches by draft type to handlers; idempotent on approval_id;
     writes action_log; first handler: Gmail send-draft (sandbox only).
   - Accept: duplicate events don't double-send; missing approval → refused and logged.
+  - **Prereq (P0-03 security review H2):** bind each approval to the content approved
+    (`approval.payload_sha256` from the payload the API showed; executor recomputes and refuses on
+    mismatch) and make `draft` immutable once it leaves `pending` (trigger + allowed status transitions).
 
 - [ ] **P0-10 Approvals inbox v0** — deps: P0-05 — rules: frontend.md
   - `apps/venue-app`: Next.js PWA, generated API client, sign-in, pending drafts list, draft detail with
