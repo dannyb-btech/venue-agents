@@ -7,9 +7,8 @@
 - **Next task:** P0-03 Stamp database + RLS (P0-06 and P0-11 are also unblocked; P0-13 human)
 - **Blockers:** Toast access route for OR unknown; SevenRooms credentials not yet requested;
   no Azure subscription for this project yet (local development only until then)
-- **Human to do:** create the GitHub repo, push `main` and `dev`, confirm CI is green;
-  start Docker Desktop and run `docker compose up -d` once; copy `.env.example` to `.env`
-  (now sets the required `ENVIRONMENT`)
+- **Human to do:** start Docker Desktop and run `docker compose up -d` once (P0-03 needs Postgres)
+- **CI:** GitHub repo `dannyb-btech/venue-agents`; CI green on `dev` (all 5 jobs) as of 2026-10-25
 - **Environment:** Windows, VS Code + Claude Code, uv 0.13.5 (Python 3.12.15), pnpm, Docker Desktop.
   Norton Web Shield intercepts HTTPS: see lessons.md
 - **Branches:** `main` (scaffold) and `dev` (work); humans merge to `main` and push
