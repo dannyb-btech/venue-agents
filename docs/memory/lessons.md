@@ -3,6 +3,10 @@
 Things that cost time: library quirks, API gotchas, environment issues. Newest first.
 Format: date — area — what happened — what to do instead.
 
+- 2026-10-25 — GitHub Actions — CI failed at "Set up job" in every uv job: `astral-sh/setup-uv@v10` doesn't
+  exist (setup-uv stopped publishing floating major tags after v7; releases are `v10.3.2` etc.). Pin exact
+  action versions and check tags with `gh api repos/<owner>/<repo>/releases --jq '.[].tag_name'`.
+
 - 2026-10-25 — uv prerelease — OpenTelemetry SDK 1.45 needs `semantic-conventions==0.66b1`, and the
   Azure Monitor distro a beta exporter and 0.66b0 instrumentations, so `prerelease = "explicit"` can't
   resolve. Switched to `"if-necessary"` (`if-necessary-or-explicit` is deprecated). Side effect: any
