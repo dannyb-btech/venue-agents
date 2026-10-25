@@ -1,0 +1,55 @@
+# Virtual workspace root: no package of its own, only shared tooling config.
+# Members: Python apps, connectors and shared packages (each has its own pyproject.toml).
+
+[tool.uv.workspace]
+members = ["apps/*", "apps/connectors/*", "packages/*"]
+# Not Python packages: the connectors folder itself and the Next.js app.
+# Connector folders join the workspace automatically once they have a pyproject.toml.
+exclude = ["apps/connectors", "apps/venue-app"]
+
+[tool.uv]
+# Agent Framework's Anthropic and durable packages are prerelease: allow betas only where pinned.
+prerelease = "explicit"
+
+[dependency-groups]
+dev = [
+    "ruff==0.17.2",
+    "pyright==1.1.414",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "pre-commit==4.7.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["apps/venue-app"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101"]
+# Claude Code hooks run fixed local tools (uv/ruff) on paths from Claude Code itself.
+".claude/hooks/**" = ["S603", "S607"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["va_*"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "basic"
+strict = ["packages"]
+include = ["apps", "packages", "tests"]
+exclude = ["apps/venue-app", "**/node_modules", "**/__pycache__", ".venv"]
+
+[tool.pytest.ini_options]
+testpaths = ["apps", "packages", "tests"]
+addopts = ["--import-mode=importlib", "--strict-markers", "-ra"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "isolation: cross-tenant isolation tests (must always pass)",
+]

@@ -17,6 +17,7 @@ AI gateway supports per-consumer token limits, backend pools with circuit breake
   (roster optimisation, complex reasoning). Prompt caching for stable instructions and venue context.
 - All model calls go through **API Management** (AI gateway): per-venue token limits keyed on venue ID,
   cost attribution, and (from phase 3) a backend pool across several Foundry deployments and regions.
+  Local development only may call a Foundry dev deployment directly (ADR-0016).
 - Model names are configuration, not code (`MODEL_TRIAGE`, `MODEL_DRAFT`, `MODEL_REASONING`).
 
 ## Consequences

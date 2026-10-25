@@ -3,12 +3,15 @@
 Goal: everything a single agent run needs end to end, with tenancy and scale foundations built in.
 Gate 1: OR data flowing (read-only) into the canary stamp.
 
-- [ ] **P0-01 Monorepo bootstrap** — deps: none — docs: CLAUDE.md, ADR-0009
+- [x] **P0-01 Monorepo bootstrap** — deps: none — docs: CLAUDE.md, ADR-0009
   - `uv` workspace (Python 3.12) with members for each app and package; ruff, pyright, pytest,
     pytest-asyncio; pre-commit; `docker-compose.yml` (Postgres 16 + pgvector, Azurite, Service Bus
     emulator, Durable Task Scheduler emulator); GitHub Actions CI (lint, types, tests, isolation, secret scan).
   - Accept: `uv sync`, `uv run ruff check .`, `uv run pyright`, `uv run pytest` all pass on a fresh clone;
     CI green; CLAUDE.md commands section confirmed accurate.
+  - Done 2026-10-25: uv workspace of 7 `va-*` members, ruff/pyright/pytest/pre-commit (gitleaks), compose
+    (Service Bus opt-in profile), CI workflow. Checks pass locally and on a fresh clone; CI green pending
+    first push to GitHub; compose not started (Docker Desktop was off).
 
 - [ ] **P0-02 Core package: tenancy, settings, telemetry, secrets, errors** — deps: P0-01 — docs: security.md
   - `packages/core`: `TenantContext` (tenant_id, venue_id, stamp_id, user/role), context propagation,

@@ -50,13 +50,17 @@ docs/                  architecture, ADRs, build phases, memory, runbooks
 prompts/               session kickoff prompts for each build step
 ```
 
-## Commands (available once task P0-01 is done)
+## Commands
 
-- Install: `uv sync` · Lint: `uv run ruff check . && uv run ruff format --check .`
-- Types: `uv run pyright` · Tests: `uv run pytest` · Isolation: `uv run pytest tests/isolation`
-- Local services: `docker compose up -d` (Postgres + pgvector, Azurite, Service Bus emulator)
-- Migrations: `uv run alembic -c packages/db/alembic.ini upgrade head`
-- Venue app: `pnpm --dir apps/venue-app dev` · Infra check: `az bicep build --file infra/bicep/main.bicep`
+- Install: `uv sync` · Hooks (once per clone): `uv run pre-commit install` (ruff + gitleaks)
+- Lint: `uv run ruff check . && uv run ruff format --check .` · Types: `uv run pyright`
+- Tests: `uv run pytest` · Isolation: `uv run pytest tests/isolation`
+- Local services: `docker compose up -d` (Postgres + pgvector, Azurite, Durable Task Scheduler emulator,
+  dashboard http://localhost:8082). Service Bus emulator is opt-in (~2 GB): `docker compose --profile servicebus up -d`
+- Migrations (from P0-03): `uv run alembic -c packages/db/alembic.ini upgrade head`
+- Venue app (from P0-10): `pnpm --dir apps/venue-app dev`
+- Infra check (from P0-11): `az bicep build --file infra/bicep/main.bicep`
+- Packages are named `va-<name>` (import `va_<name>`). Branches: work on `dev`; `main` via human merge.
 - Full check: `/verify`
 
 ## How we work

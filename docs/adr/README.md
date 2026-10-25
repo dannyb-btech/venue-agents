@@ -20,3 +20,4 @@ Create one with `/adr <title>`. Template: `0000-template.md`.
 | [0013](0013-model-provider-abstraction-au-residency.md) | Model provider abstraction; Bedrock AU for residency | Proposed |
 | [0014](0014-zapier-make-for-long-tail-only.md) | Zapier/Make only for the long tail | Accepted |
 | [0015](0015-webflow-marketing-site.md) | Marketing site on Webflow | Proposed |
+| [0016](0016-direct-foundry-calls-local-dev-only.md) | Direct Foundry calls in local development only; deployed stamps use APIM | Accepted |

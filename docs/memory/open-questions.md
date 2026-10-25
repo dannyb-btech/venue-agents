@@ -15,7 +15,12 @@ Questions for the founders/partners. Answer inline with date; turn decisions int
 ## Technical
 
 - [ ] Claude quotas (tokens/min) available on Foundry for our subscription and regions.
-- [ ] Current Agent Framework Anthropic package versions and stability (check at P0-08).
+- [x] Current Agent Framework Anthropic package versions and stability (check at P0-08).
+      2026-10-25: `agent-framework-core` 1.23.0 (GA); `agent-framework-anthropic` 1.0.0b261022 and
+      `agent-framework-durabletask` 1.0.0b260922 (prerelease); `durabletask(-azuremanaged)` 1.12.0.
+      Re-check at P0-08 (weekly releases). Core GA is ADR-0004's revisit trigger: review it before P0-08.
+- [ ] Does `AnthropicFoundryClient` support Entra ID / managed identity, and can it target an APIM URL
+      (or do we use `AnthropicClient(base_url=...)`)? Learn documents API keys only. Check at P0-08.
 - [ ] Do Foundry Agent Service prompt agents support Claude? (Not relied on; confirm before P3-07.)
 - [ ] Azure subscription for the project: pay-as-you-go (Claude on Foundry requires a paid subscription,
       not free trial, credit-only or CSP).

@@ -1,0 +1,14 @@
+# Secret scanning config for pre-commit and CI. Extends gitleaks' default rules.
+title = "venue-agents"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public, well-known local emulator credentials (published by Microsoft; not secrets)"
+regexes = [
+  # Azurite's documented devstoreaccount1 key
+  '''Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''',
+  # Service Bus emulator's documented placeholder key
+  '''SharedAccessKey=SAS_KEY_VALUE''',
+]

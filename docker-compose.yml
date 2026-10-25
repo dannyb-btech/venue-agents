@@ -1,0 +1,68 @@
+# Local development services. Never used in Azure.
+#   docker compose up -d                            Postgres + pgvector, Azurite, Durable Task Scheduler emulator
+#   docker compose --profile servicebus up -d       also starts the Service Bus emulator (+ SQL Server, ~2 GB RAM)
+# Credentials here are local-only placeholders; real secrets live in Key Vault (see packages/core secrets).
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg16-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-venue_agents}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./infra/local/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 512m
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    command: >-
+      azurite -l /data --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+      --skipApiVersionCheck --loose
+    ports: ["127.0.0.1:10000:10000", "127.0.0.1:10001:10001", "127.0.0.1:10002:10002"]
+    volumes: ["azurite-data:/data"]
+    mem_limit: 256m
+
+  # Durable Task Scheduler emulator: gRPC on 8080, dashboard on http://localhost:8082
+  dts:
+    image: mcr.microsoft.com/dts/dts-emulator:v0.0.10
+    environment:
+      DTS_TASK_HUB_NAMES: default
+    ports: ["127.0.0.1:8080:8080", "127.0.0.1:8082:8082"]
+    mem_limit: 512m
+
+  # --- Opt-in: Service Bus emulator (profile "servicebus") ---
+  # Setting ACCEPT_EULA=Y in your .env accepts the Service Bus emulator and SQL Server EULAs:
+  #   https://github.com/Azure/azure-service-bus-emulator-installer/blob/main/EMULATOR_EULA.txt
+  #   https://go.microsoft.com/fwlink/?LinkId=746388
+  mssql:
+    profiles: ["servicebus"]
+    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+    environment:
+      ACCEPT_EULA: ${ACCEPT_EULA:-}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-}
+    mem_limit: 2g
+
+  servicebus:
+    profiles: ["servicebus"]
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.1
+    depends_on: [mssql]
+    environment:
+      ACCEPT_EULA: ${ACCEPT_EULA:-}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-}
+      SQL_SERVER: mssql
+      SQL_WAIT_INTERVAL: "15"
+    volumes:
+      - ./infra/local/servicebus/Config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
+    ports: ["127.0.0.1:5672:5672", "127.0.0.1:5300:5300"]
+
+volumes:
+  pg-data:
+  azurite-data:

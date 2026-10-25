@@ -24,6 +24,7 @@ out/
 # Infra build output
 infra/**/*.json
 !infra/bicep/params/*.json
+!infra/local/**/*.json
 
 # Eval data must be anonymised before commit; raw exports never committed
 evals/**/raw/

@@ -1,0 +1,14 @@
+[project]
+name = "va-platform-api"
+version = "0.1.0"
+description = "Platform API: tenants, users, connections, drafts, approvals."
+requires-python = ">=3.12,<3.13"
+dependencies = ["va-core", "va-db"]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+va-core = { workspace = true }
+va-db = { workspace = true }
