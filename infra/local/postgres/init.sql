@@ -7,5 +7,7 @@ CREATE DATABASE catalog;
 \connect catalog
 CREATE EXTENSION IF NOT EXISTS vector;
 
-\connect :"POSTGRES_DB"
+-- The entrypoint doesn't pass POSTGRES_DB as a psql variable; read it from the environment.
+\getenv stamp_db POSTGRES_DB
+\connect :"stamp_db"
 CREATE EXTENSION IF NOT EXISTS vector;

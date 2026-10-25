@@ -3,6 +3,12 @@
 Things that cost time: library quirks, API gotchas, environment issues. Newest first.
 Format: date — area — what happened — what to do instead.
 
+- 2026-10-25 — Docker Compose — DTS emulator `v0.0.10` (latest) crashes on start with "Scheduler name is not
+  set", even with the documented `docker run`; pinned `v0.0.9`. Re-test newer tags before bumping.
+- 2026-10-25 — Postgres init scripts — `.sql` files in `docker-entrypoint-initdb.d` don't get `POSTGRES_DB`
+  as a psql variable; use `\getenv var POSTGRES_DB`. A failed init leaves a non-empty volume and init never
+  re-runs: remove the `pg-data` volume (`docker volume rm venue-agents_pg-data`) after fixing the script.
+
 - 2026-10-25 — GitHub Actions — CI failed at "Set up job" in every uv job: `astral-sh/setup-uv@v10` doesn't
   exist (setup-uv stopped publishing floating major tags after v7; releases are `v10.3.2` etc.). Pin exact
   action versions and check tags with `gh api repos/<owner>/<repo>/releases --jq '.[].tag_name'`.

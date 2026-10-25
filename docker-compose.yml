@@ -32,7 +32,8 @@ services:
 
   # Durable Task Scheduler emulator: gRPC on 8080, dashboard on http://localhost:8082
   dts:
-    image: mcr.microsoft.com/dts/dts-emulator:v0.0.10
+    # v0.0.10 crashes on start ("Scheduler name is not set"), even with the documented defaults.
+    image: mcr.microsoft.com/dts/dts-emulator:v0.0.9
     environment:
       DTS_TASK_HUB_NAMES: default
     ports: ["127.0.0.1:8080:8080", "127.0.0.1:8082:8082"]

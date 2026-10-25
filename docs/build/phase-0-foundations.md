@@ -11,7 +11,7 @@ Gate 1: OR data flowing (read-only) into the canary stamp.
     CI green; CLAUDE.md commands section confirmed accurate.
   - Done 2026-10-25: uv workspace of 7 `va-*` members, ruff/pyright/pytest/pre-commit (gitleaks), compose
     (Service Bus opt-in profile), CI workflow. Checks pass locally and on a fresh clone; CI green on GitHub
-    (2026-10-25, after pinning setup-uv v10.3.2); compose not started (Docker Desktop was off).
+    (2026-10-25, after pinning setup-uv v10.3.2); compose verified 2026-10-25 (DTS emulator pinned v0.0.9).
 
 - [x] **P0-02 Core package: tenancy, settings, telemetry, secrets, errors** — deps: P0-01 — docs: security.md
   - `packages/core`: `TenantContext` (tenant_id, venue_id, stamp_id, user/role), context propagation,
