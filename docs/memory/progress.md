@@ -13,7 +13,7 @@
 - **Local services:** `docker compose up -d` — Postgres (pgvector 0.8.7; logins `va_app_local`,
   `va_catalog_local`, `va_provision_local`), Azurite, DTS emulator v0.0.9 (dashboard http://localhost:8082).
   DB tests need `DATABASE_ADMIN_URL` (127.0.0.1) in `.env`. Catalog: `CATALOG_ADMIN_URL`.
-- **CI:** GitHub repo `dannyb-btech/venue-agents`; green on `dev` at P0-03; P0-04 and P0-06 not yet pushed
+- **CI:** GitHub repo `dannyb-btech/venue-agents`; green on `dev` at P0-06 (`ce823fe`, all 5 jobs, 2026-10-28)
 - **Environment:** Windows, VS Code + Claude Code, uv 0.13.5 (Python 3.12.15), pnpm, Docker Desktop.
   Norton Web Shield intercepts HTTPS: see lessons.md
 - **Branches:** `main` (scaffold) and `dev` (work); humans merge to `main` and push
