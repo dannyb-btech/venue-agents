@@ -8,7 +8,7 @@ Goal: three agents live at OR; cost per run measured.
 
 - [ ] **P2-02 Supplier price lists + Xero bills** — deps: P0-07
   - Ingest supplier price lists (Drive, varied formats) into `supplier`, `price_list_item`; Xero bills read;
-    `xero.create_draft_bill` draft tool.
+    `xero_draft_bill` draft tool.
   - Accept: parser tests on sample lists; unparseable files flagged for a human.
 
 - [ ] **P2-03 Wine Buyer agent** — deps: P2-01, P2-02 — skill: `/new-agent wine-buyer`
@@ -22,7 +22,7 @@ Goal: three agents live at OR; cost per run measured.
   - Accept: unit tests with fixed scenarios; no model involvement in numbers.
 
 - [ ] **P2-05 Tanda roster drafts** — deps: P0-07
-  - `tanda.create_roster_draft` (unpublished roster); executor never publishes; manager publishes in Tanda.
+  - `tanda_draft_roster` (unpublished roster); executor never publishes; manager publishes in Tanda.
   - Accept: tests confirm no publish endpoint is called anywhere.
 
 - [ ] **P2-06 Office Manager agent** — deps: P2-04, P2-05 — skill: `/new-agent office-manager`

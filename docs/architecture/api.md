@@ -41,11 +41,15 @@ tenant an operator is managing; it is never a tenant context for venue data.
 
 ## Connector MCP servers (per stamp, internal)
 
-Tool naming `<system>.<verb>_<noun>`. Examples:
-`gmail.search_threads`, `gmail.get_thread`, `gmail.create_draft_reply` (draft row only),
-`drive.search_files`, `drive.read_file`, `sevenrooms.get_guest`, `sevenrooms.list_reservations`,
-`toast.get_sales`, `toast.get_stock`, `tanda.get_roster`, `tanda.get_timesheets`,
-`tanda.create_roster_draft`, `xero.list_bills`, `xero.create_draft_bill`, `stripe.create_payment_link_draft`.
+Built on `va_core.mcp` (ADR-0018). Every MCP request carries a signed run envelope
+(`X-VA-Run-Envelope`: HS256 per-stamp key, tenant/venue/stamp/run/agent and the agent's tool allow-list
+for that connector, ≤ 10 min); tools never take a tenant argument. Stateless streamable HTTP at `/mcp`,
+`GET /healthz`. Tool naming `<system>_<verb>_<noun>` (Claude tool names allow no dots); draft tools
+`<system>_draft_<noun>`. Examples:
+`gmail_search_threads`, `gmail_get_thread`, `gmail_draft_reply` (draft row only),
+`drive_search_files`, `drive_read_file`, `sevenrooms_get_guest`, `sevenrooms_list_reservations`,
+`toast_get_sales`, `toast_get_stock`, `tanda_get_roster`, `tanda_get_timesheets`,
+`tanda_draft_roster`, `xero_list_bills`, `xero_draft_bill`, `stripe_draft_payment_link`.
 
 ## Internal services
 

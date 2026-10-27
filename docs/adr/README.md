@@ -22,3 +22,4 @@ Create one with `/adr <title>`. Template: `0000-template.md`.
 | [0015](0015-webflow-marketing-site.md) | Marketing site on Webflow | Proposed |
 | [0016](0016-direct-foundry-calls-local-dev-only.md) | Direct Foundry calls in local development only; deployed stamps use APIM | Accepted |
 | [0017](0017-control-plane-catalog-and-stamp-provisioning.md) | Control plane catalog (no RLS, `va_catalog`), `va_provision` in stamps, placement, Entra DB logins | Accepted |
+| [0018](0018-run-envelopes-and-connector-framework.md) | Signed run envelopes (HS256 per stamp), connector framework, `<system>_<verb>_<noun>` tool names | Accepted |

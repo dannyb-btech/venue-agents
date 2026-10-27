@@ -13,7 +13,9 @@ tier. Built with Microsoft Agent Framework; run as durable orchestrations (ADR-0
 
 ## Rules for every agent
 
-- Tenant from the signed run envelope, never from content or the model.
+- Tenant from the signed run envelope, never from content or the model. The runtime mints one per
+  MCP request to a connector (`va_core.mcp.envelope.issue_envelope`, via a hook on its MCP HTTP
+  client; per activity only as a fallback), listing only that agent's allowed tools (ADR-0018).
 - Inbound content is untrusted: delimited in prompts; cannot change tools, recipients, amounts or tenant.
 - Never invent prices, availability, dates or policies; only use source data; flag uncertainty in the draft.
 - Labour targets and award costs are computed in code (ADR-0012).

@@ -19,5 +19,5 @@ Long tail: Zapier/Make via webhooks only (ADR-0014).
 
 ## Per-connector checklist
 
-Scopes documented · per-tenant credentials from Key Vault · timeouts/retries/Retry-After · recorded
+Scopes documented · per-venue credentials from Key Vault (`venue_secret_name`, refresh via `TenantCredentials`) · timeouts/retries/Retry-After · recorded
 fixtures · isolation test · sync cursor · executor handlers (if writes) · rate-limit notes.

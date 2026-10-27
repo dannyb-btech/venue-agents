@@ -53,12 +53,20 @@ Gate 1: OR data flowing (read-only) into the canary stamp.
     `/me`, `/connections` + OAuth start/callback scaffolding, `/drafts`, approve/reject (raising an
     approval event onto Service Bus), `/runs`. OpenAPI published.
   - Accept: API tests incl. a viewer can't approve; no endpoint accepts tenant_id; OpenAPI generated.
+  - **ADR-0018:** OAuth callback stores tokens as `venue_secret_name(ctx, system, "refresh-token")` on
+    the venue's `connection` row and refreshes only through `va_core.credentials.TenantCredentials`.
 
-- [ ] **P0-06 Connector framework** — deps: P0-02 — docs: integrations.md, ADR-0005
+- [x] **P0-06 Connector framework** — deps: P0-02 — docs: integrations.md, ADR-0005
   - `packages/core.mcp`: MCP server base with tenant-context middleware, tool registry enforcing
     read/draft categories, draft helper writing `draft` rows, per-tenant credential loading, rate limiting.
   - Accept: a sample connector with one read and one draft tool passes tests; a tool marked "write" is
     rejected at registration.
+  - Done 2026-10-28 (ADR-0018): `va_core.mcp` (`va-core[mcp]`, mcp 2.3.0): HS256 per-stamp run envelopes,
+    `ToolRegistry` (read/draft only, `<system>_<verb>_<noun>`, no tenant/alias args), stateless MCP server
+    with envelope middleware (method + tool allow-list, raw-argument check, rate limits, safe errors, spans),
+    `ToolContext` bound to the envelope; `va_core.credentials` (per-venue, refresh serialised per credential,
+    rotation stored in the lock); `va_db.connectors` + `connector_deps`. Sample connector tests incl. a real
+    uvicorn socket; isolation tests (drafts, two venues, cross-tenant secret refs, refresh lock).
 
 - [ ] **P0-07 First connectors: Gmail, Drive, Tanda, Xero (read)** — deps: P0-06, P0-13 — skill: `/new-connector`
   - Read tools + sync workers for each, against sandbox/demo orgs, recorded anonymised fixtures.
@@ -72,8 +80,14 @@ Gate 1: OR data flowing (read-only) into the canary stamp.
   - Accept: end-to-end local test (with a mocked model client) passes; one manual run against a Foundry dev
     deployment documented in lessons.md; orchestration survives a worker restart mid-wait.
   - **Prereq (P0-03 security review H1):** per-service DB roles (`va_api`, `va_agent`, `va_executor`,
-    `va_sync`) replacing the shared `va_app`, with an ADR and a per-role privilege-matrix test. The agent
-    runtime must not be able to write `approval`, `role_assignment` or `action_log`.
+    `va_sync`, `va_connector`) replacing the shared `va_app`, with an ADR and a per-role privilege-matrix
+    test. The agent runtime must not be able to write `approval`, `role_assignment` or `action_log`;
+    `va_connector` gets SELECT on `connection`/`agent_run` and INSERT on `draft` only (ADR-0018).
+  - **Prereqs (ADR-0018):** mint run envelopes per MCP request (check Agent Framework's MCP tool header
+    hook with `azure-researcher`); `agent_run` row before the first envelope; draft idempotency key
+    (unique `(tenant_id, run_id, idempotency_key)`) so retried activities don't duplicate drafts;
+    decide how the Service Bus trigger message is trusted; the runtime's MCP client must use the
+    handshake-era protocol against connectors until mcp fixes the stateless 2026-07-28 path (lessons.md).
 
 - [ ] **P0-09 Action executor** — deps: P0-08 — docs: ADR-0005, ADR-0006
   - Consumes approval events; dispatches by draft type to handlers; idempotent on approval_id;
@@ -82,6 +96,7 @@ Gate 1: OR data flowing (read-only) into the canary stamp.
   - **Prereq (P0-03 security review H2):** bind each approval to the content approved
     (`approval.payload_sha256` from the payload the API showed; executor recomputes and refuses on
     mismatch) and make `draft` immutable once it leaves `pending` (trigger + allowed status transitions).
+  - **ADR-0018:** write-scoped grants use their own connection secret kind and refresh-lock key.
 
 - [ ] **P0-10 Approvals inbox v0** — deps: P0-05 — rules: frontend.md
   - `apps/venue-app`: Next.js PWA, generated API client, sign-in, pending drafts list, draft detail with

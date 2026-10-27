@@ -3,23 +3,41 @@
 ## Current state
 
 - **Phase:** 0 — Foundations (in progress)
-- **Last task done:** P0-04 Control plane + tenant catalog (ADR-0017; commits on `dev`, not pushed)
-- **Next task:** P0-05 Platform API (P0-06, P0-11 also unblocked; P0-13 human). Before P0-05/P0-12: ADR on
-  edge routing + entitlement distribution (ADR-0017 follow-up). Before P0-08/P0-09: security-review H1
-  (per-service DB roles + ADR) and H2 (approval bound to payload).
+- **Last task done:** P0-06 Connector framework (ADR-0018; committed on `dev`, not pushed)
+- **Next task:** P0-05 Platform API (P0-11 also unblocked; P0-07 waits on P0-13 human access requests).
+  Before P0-05/P0-12: ADR on edge routing + entitlement distribution (ADR-0017 follow-up). Before
+  P0-08: H1 per-service roles (now incl. `va_connector`), envelope minting per MCP request, draft
+  idempotency key, MCP client on the handshake-era protocol (see phase file). Before P0-09: H2.
 - **Blockers:** Toast access route for OR unknown; SevenRooms credentials not yet requested;
   no Azure subscription for this project yet (local development only until then)
 - **Local services:** `docker compose up -d` — Postgres (pgvector 0.8.7; logins `va_app_local`,
   `va_catalog_local`, `va_provision_local`), Azurite, DTS emulator v0.0.9 (dashboard http://localhost:8082).
-  DB tests need `DATABASE_ADMIN_URL` (127.0.0.1) in `.env`. Catalog: `CATALOG_ADMIN_URL`; local catalog has
-  stamp `canary-local` registered and one smoke-test tenant/venue.
-- **CI:** GitHub repo `dannyb-btech/venue-agents`; green on `dev` at P0-03; the isolation job now also runs
-  `apps/control-plane` db tests (not yet run on GitHub: push pending)
+  DB tests need `DATABASE_ADMIN_URL` (127.0.0.1) in `.env`. Catalog: `CATALOG_ADMIN_URL`.
+- **CI:** GitHub repo `dannyb-btech/venue-agents`; green on `dev` at P0-03; P0-04 and P0-06 not yet pushed
 - **Environment:** Windows, VS Code + Claude Code, uv 0.13.5 (Python 3.12.15), pnpm, Docker Desktop.
   Norton Web Shield intercepts HTTPS: see lessons.md
 - **Branches:** `main` (scaffold) and `dev` (work); humans merge to `main` and push
 
 ## Session log (newest first)
+
+### 2026-10-28 — P0-06 Connector framework
+- Decided with user (ADR-0018): run envelopes are HS256 JWTs with a per-stamp key (`X-VA-Run-Envelope`,
+  ≤ 600 s, audience = one connector, carrying the agent's tool allow-list); tool names
+  `<system>_<verb>_<noun>`, draft tools `<system>_draft_<noun>`; mcp 2.3.0 (`va-core[mcp]`, PyJWT 2.15.1).
+- `va_core.mcp`: envelope, `ToolRegistry` (read/draft only, no tenant/alias args), stateless MCP server
+  (method + tool allow-list, raw-argument check, rate limits, code-only errors, spans), `ToolContext`
+  bound to the envelope, sample connector + fakes (`testing.py`). `va_core.credentials` (per-venue,
+  refresh per credential with rotation stored inside the lock), `va_core.tools`, `venue_secret_name`;
+  `va_db.connectors` (draft writer checks the run's venue/status, try-lock with bounded wait),
+  `va_db.connector_deps`. Ruff `SLF` enabled. Closes P0-02 follow-ups M6 and OAuth refresh serialisation.
+- Verified: ruff, format, pyright 0 errors; pytest 490 passed / 4 expected skips; isolation 169 passed; CI non-DB subset 293 passed;
+  7 mutation checks caught (write category, allow-list, stamp, per-tenant credential key, method
+  allow-list, unknown args, draft venue); manual run over a real uvicorn socket.
+- Found: mcp 2.3.0 stateless JSON responses arrive empty under uvicorn and the 2026-07-28 protocol path
+  fails there (ASGI test transport hides both): switched to SSE responses, added a real-socket test.
+- security-reviewer (H1 per-tenant token cache across venues; M1-M4; L1-L5) and architect-reviewer
+  (12 findings) addressed in code or recorded as P0-05/P0-08/P0-09/P0-11 follow-ups in ADR-0018 and the
+  phase file (draft idempotency key, `va_connector` role, Key Vault set rights, envelope minting).
 
 ### 2026-10-26/27 — P0-04 Control plane + tenant catalog
 - Decided with user (ADR-0017): catalog without RLS behind `va_catalog`; `va_provision` stamp role

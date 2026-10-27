@@ -44,7 +44,8 @@ manager approves. Decisions: `docs/adr/`.
 1. A trigger (schedule staggered per venue, webhook, inbox event) puts a message on Service Bus.
 2. The agent runtime starts a durable orchestration for that tenant (tenant context from the message
    envelope signed by the platform, never from content).
-3. Activities gather context deterministically (SQL over synced data, connector reads).
+3. Activities gather context deterministically (SQL over synced data, connector reads). Every call to a
+   connector MCP server carries a signed run envelope for that tenant, venue and run (ADR-0018).
 4. The Agent Framework agent calls Claude through the gateway and uses its allow-listed tools;
    draft tools create `draft` rows.
 5. The orchestration notifies the venue and waits (zero compute) for the approval event.

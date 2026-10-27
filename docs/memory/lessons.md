@@ -3,6 +3,23 @@
 Things that cost time: library quirks, API gotchas, environment issues. Newest first.
 Format: date — area — what happened — what to do instead.
 
+- 2026-10-28 — mcp 2.x — FastMCP is now `mcp.server.mcpserver.MCPServer`; `ServerMiddleware(ctx,
+  call_next)` sees `ctx.method`, raw `ctx.params` and `ctx.request` (Starlette request). At that layer a
+  `tools/list` result is a dict, and on the 2026-07-28 protocol `ttlMs`/`cacheScope` are required.
+  The SDK silently drops unknown tool arguments: validate raw params yourself.
+- 2026-10-28 — mcp 2.3.0 transport — stateless `json_response=True` responses arrive empty under
+  uvicorn, and the 2026-07-28 `server/discover` path fails there; `httpx2.ASGITransport` hides both.
+  Use SSE responses and `Client(..., mode="legacy")`; keep one test over a real uvicorn socket.
+- 2026-10-28 — mcp 2.x HTTP — DNS-rebinding protection rejects any Host not in `allowed_hosts`
+  (421 Misdirected Request, even `testserver`); set `TransportSecuritySettings(allowed_hosts=...)`.
+  Raw JSON-RPC needs `Accept: application/json, text/event-stream`.
+- 2026-10-28 — pytest-asyncio + anyio — an async fixture that enters an anyio task group (e.g.
+  `session_manager.run()`) fails at teardown ("cancel scope in a different task"): setup and teardown
+  run in different tasks. Enter it inside the test (`async with`) instead.
+- 2026-10-28 — Claude tool names — must match `^[a-zA-Z0-9_-]{1,64}$`: no dots (ADR-0018).
+- 2026-10-28 — isolation tests — the session-scoped `seeded` database is shared: a module that adds
+  rows other tests count (e.g. a second venue) must override `seeded` with its own `temp_database`.
+
 - 2026-10-27 — uvicorn on Windows — plain `uvicorn` picks the Proactor loop on Windows (Selector only
   with --reload/--workers), so psycopg async fails at start-up. Run the control plane with
   `python -m va_control_plane serve` (asyncio.run with SelectorEventLoop).

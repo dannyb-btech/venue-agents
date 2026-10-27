@@ -22,6 +22,8 @@ details, line-level payroll). AU-processing option via Bedrock AU (ADR-0013).
 ## Agent safety
 
 - Tenant set in code from the authenticated session or signed run envelope, never by a model.
+  Connectors accept only a run envelope (HS256 per-stamp key, ≤ 10 min, audience = one connector,
+  carrying the agent's tool allow-list) and enforce the allow-list themselves (ADR-0018).
 - Inbound email, documents, web content treated as untrusted; injection eval cases per agent.
 - No autonomous send/pay/order/publish (ADR-0006). Full audit trail of drafts, edits, approvals, actions.
 

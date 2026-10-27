@@ -11,6 +11,8 @@ Questions for the founders/partners. Answer inline with date; turn decisions int
 - [ ] Does OR run payroll in Tanda or Xero (both are in the stack)?
 - [ ] Commercial terms for using OR as testimonial and case study.
 - [ ] Product/company name (repo is called `venue-agents` as a placeholder).
+- [ ] Tenant vs venue: is a multi-venue group one tenant with several venues (the schema supports it;
+      ADR-0018 keys credentials per venue), or is each venue its own tenant (overview.md line 3)?
 
 ## Technical
 
