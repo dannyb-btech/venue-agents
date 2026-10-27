@@ -15,10 +15,14 @@ Defences on the runtime engine (`create_engine` / `create_runtime_engine`):
 from __future__ import annotations
 
 import re
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from sqlalchemy import Connection, event, text
+import psycopg
+from psycopg.conninfo import make_conninfo
+from psycopg.rows import TupleRow
+from pydantic import SecretStr
+from sqlalchemy import URL, Connection, event, make_url, text
 from sqlalchemy.engine import ExecutionContext
 from sqlalchemy.engine.interfaces import DBAPIConnection, DBAPICursor
 from sqlalchemy.ext.asyncio import (
@@ -33,7 +37,10 @@ from sqlalchemy.pool import ConnectionPoolEntry, PoolResetState
 from va_core.errors import ConfigurationError, TenantContextError
 from va_core.settings import CoreSettings
 from va_core.tenancy import TenantContext
-from va_db.rls import APP_ROLE
+from va_db.rls import APP_ROLE, GROUP_ROLES
+
+PasswordProvider = Callable[[], Awaitable[SecretStr]]
+"""Returns the password for a new connection (local secret or Entra access token)."""
 
 _SET_TENANT_OPTION = "va_set_tenant"
 _SET_TENANT = text("SELECT set_config('app.tenant_id', :tenant_id, true)").execution_options(
@@ -56,7 +63,13 @@ _ROLE_CHECK = text(
             SELECT FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
             WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
               AND pg_has_role(current_user, c.relowner, 'MEMBER')
-        ) AS owns_tables
+        ) AS owns_tables,
+        ARRAY(
+            SELECT r.rolname FROM pg_roles r
+            WHERE r.rolname = ANY(:groups) AND r.rolname <> :app_role
+              AND pg_has_role(current_user, r.oid, 'MEMBER')
+            ORDER BY r.rolname
+        ) AS other_groups
     """
 )
 
@@ -98,15 +111,55 @@ def _reset_session_state(
 
 
 def create_runtime_engine(
-    url: str, *, connect_timeout: int = 10, pool_size: int = 5, max_overflow: int = 10
+    url: str | URL,
+    *,
+    connect_timeout: int = 10,
+    pool_size: int = 5,
+    max_overflow: int = 10,
+    password: PasswordProvider | None = None,
+    pool_recycle: int = -1,
 ) -> AsyncEngine:
-    """An engine with the runtime defences. Pass a `va_app` member's URL, never the admin's."""
+    """An engine with the runtime defences. Pass a runtime role's URL, never the admin's.
+
+    With `password`, the URL carries no password: each new connection awaits the provider (a local
+    secret, or an Entra token in Azure; see `va_db.credentials`), so expiring tokens are never
+    reused for a new login.
+    """
+    kwargs: dict[str, object] = {}
+    if password is not None:
+        parsed = make_url(url)
+        if parsed.password is not None:
+            raise ConfigurationError("pass the password in the URL or as a provider, not both")
+        options = {key: str(value) for key, value in parsed.query.items()}
+        if {"password", "passfile"} & options.keys():
+            raise ConfigurationError("pass the password as a provider, not in the URL query")
+
+        async def connect() -> psycopg.AsyncConnection[TupleRow]:
+            secret = await password()
+            conninfo = make_conninfo(
+                host=parsed.host,
+                port=parsed.port or 5432,
+                dbname=parsed.database,
+                user=parsed.username,
+                connect_timeout=connect_timeout,
+                **options,
+            )
+            # The secret goes as a keyword, never into a string that could be logged.
+            return await psycopg.AsyncConnection.connect(
+                conninfo, password=secret.get_secret_value()
+            )
+
+        kwargs["async_creator"] = connect
     engine = create_async_engine(
         url,
         pool_pre_ping=True,
         pool_size=pool_size,
         max_overflow=max_overflow,
+        pool_recycle=pool_recycle,
+        # Errors must not carry bound values (names, payloads) into logs and traces.
+        hide_parameters=True,
         connect_args={"connect_timeout": connect_timeout},
+        **kwargs,
     )
     event.listen(engine.sync_engine, "before_cursor_execute", _guard)
     event.listen(engine.sync_engine, "reset", _reset_session_state)
@@ -127,22 +180,31 @@ def create_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]
     return async_sessionmaker(engine, expire_on_commit=False)
 
 
-async def assert_rls_enforced(engine: AsyncEngine) -> None:
-    """Fail start-up unless the login is a `va_app` member that can't bypass RLS.
+async def assert_rls_enforced(engine: AsyncEngine, role: str = APP_ROLE) -> None:
+    """Fail start-up unless the login is a member of `role` that can't bypass RLS.
 
     Checks every role the login can reach (a member of a superuser or BYPASSRLS role could
-    `SET ROLE` to it) and that it owns no tables (owners can disable RLS).
+    `SET ROLE` to it), that it owns no tables (owners can disable RLS) and that it is in no other
+    platform group role. `role` is `va_app` for runtime services, `va_provision` / `va_catalog`
+    for the control plane.
     """
     async with engine.connect() as conn:
-        row = (await conn.execute(_ROLE_CHECK, {"app_role": APP_ROLE})).one()
+        row = (
+            await conn.execute(_ROLE_CHECK, {"app_role": role, "groups": list(GROUP_ROLES)})
+        ).one()
     if row.can_bypass:
         raise ConfigurationError(
-            "database login bypasses row-level security; use a va_app member, not the admin role"
+            f"database login bypasses row-level security; use a {role} member, not the admin role"
         )
     if row.owns_tables:
-        raise ConfigurationError("database login owns stamp tables; use a va_app member")
+        raise ConfigurationError(f"database login owns tables; use a {role} member")
     if not row.is_app:
-        raise ConfigurationError(f"database login is not a member of {APP_ROLE}")
+        raise ConfigurationError(f"database login is not a member of {role}")
+    if row.other_groups:
+        raise ConfigurationError(
+            f"database login for {role} is also a member of {', '.join(row.other_groups)}; "
+            "use one login per group role"
+        )
 
 
 @asynccontextmanager

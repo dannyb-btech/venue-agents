@@ -1,7 +1,8 @@
 """Settings for migrations and database test setup only.
 
-`DATABASE_ADMIN_URL` is the schema owner's login: it bypasses RLS (locally it is a superuser). It
-lives here, not in `va_core.CoreSettings`, so runtime services never load it.
+`DATABASE_ADMIN_URL` is the stamp schema owner's login: it bypasses RLS (locally it is a superuser).
+`CATALOG_ADMIN_URL` owns the catalog schema and registers stamps. Both live here, not in
+`va_core.CoreSettings`, so runtime services never load them.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ class MigrationSettings(BaseSettings):
 
     environment: Environment
     database_admin_url: SecretStr | None = None
+    catalog_admin_url: SecretStr | None = None
 
     @classmethod
     def load(cls) -> Self:

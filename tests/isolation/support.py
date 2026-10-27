@@ -29,6 +29,8 @@ class Seeded:
     db: TempDatabase
     admin: Engine
     app: Engine
+    provision: Engine
+    """A `va_provision` member: the control plane's login in a stamp."""
     a: Tenant
     b: Tenant
 
@@ -45,16 +47,17 @@ def as_tenant(engine: Engine, tenant_id: UUID | None) -> Iterator[Connection]:
             tx.rollback()
 
 
-def seed(admin: Engine, app: Engine, tenant_id: UUID) -> Tenant:
+def seed(provision: Engine, app: Engine, tenant_id: UUID) -> Tenant:
     """Insert one row per table for `tenant_id`.
 
-    The `tenant` row is created as admin (the control plane's job; the app role can't). Everything
-    else is inserted as the app role, so those inserts go through RLS.
+    The `tenant` row is created as `va_provision` (the control plane's job; the app role can't).
+    Everything else is inserted as the app role. All inserts go through RLS.
     """
     refs: Refs = {}
     rows: dict[str, Row] = {}
     tenant_row = FACTORIES["tenant"](tenant_id, refs)
-    with admin.begin() as conn:
+    with provision.begin() as conn:
+        conn.execute(SET_TENANT, {"t": str(tenant_id)})
         conn.execute(Base.metadata.tables["tenant"].insert().values(**tenant_row))
     refs["tenant"], rows["tenant"] = tenant_id, tenant_row
     with app.begin() as conn:

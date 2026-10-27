@@ -6,14 +6,14 @@ migrated database. They fail, never skip, when the database isn't configured or 
 
 from __future__ import annotations
 
-import asyncio
-import sys
-from collections.abc import Callable, Generator
+from collections.abc import Generator
 from uuid import UUID
 
 import pytest
+from sqlalchemy import create_engine, pool
 
 from tests.isolation.support import Seeded, seed
+from va_db.rls import APP_ROLE, PROVISION_ROLE
 from va_db.settings import MigrationSettings
 from va_db.testing import temp_database
 
@@ -25,15 +25,6 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
         if "tests/isolation" in item.path.as_posix():
             item.add_marker(pytest.mark.isolation)
-
-
-def pytest_asyncio_loop_factories(
-    config: pytest.Config, item: pytest.Item
-) -> dict[str, Callable[[], asyncio.AbstractEventLoop]]:
-    # psycopg's async driver can't use Windows' default Proactor loop.
-    if sys.platform == "win32":
-        return {"selector": asyncio.SelectorEventLoop}
-    return {"default": asyncio.new_event_loop}
 
 
 @pytest.fixture(scope="session")
@@ -48,11 +39,13 @@ def admin_url() -> str:
 
 @pytest.fixture(scope="session")
 def seeded(admin_url: str) -> Generator[Seeded]:
-    with temp_database(admin_url) as db:
+    with temp_database(admin_url, logins=(APP_ROLE, PROVISION_ROLE)) as db:
         admin, app = db.admin_engine(), db.app_engine()
+        provision = create_engine(db.logins[PROVISION_ROLE], poolclass=pool.NullPool)
         try:
-            a, b = seed(admin, app, TENANT_A), seed(admin, app, TENANT_B)
-            yield Seeded(db=db, admin=admin, app=app, a=a, b=b)
+            a, b = seed(provision, app, TENANT_A), seed(provision, app, TENANT_B)
+            yield Seeded(db=db, admin=admin, app=app, provision=provision, a=a, b=b)
         finally:
             admin.dispose()
             app.dispose()
+            provision.dispose()

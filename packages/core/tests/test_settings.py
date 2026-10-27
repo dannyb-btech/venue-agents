@@ -65,3 +65,17 @@ def test_empty_values_in_env_file_mean_unset(tmp_path: Path) -> None:
     assert settings.key_vault_url is None
     assert settings.managed_identity_client_id is None
     assert settings.applicationinsights_connection_string is None
+
+
+@pytest.mark.parametrize(
+    "variable", ["CONTAINER_APP_NAME", "WEBSITE_SITE_NAME", "IDENTITY_ENDPOINT"]
+)
+@pytest.mark.parametrize("environment", ["local", "test"])
+def test_local_environments_refuse_to_run_on_azure_hosting(
+    monkeypatch: pytest.MonkeyPatch, variable: str, environment: str
+) -> None:
+    # ENVIRONMENT=local/test turns off every deployed-only guard (dev auth, .env secrets, TLS).
+    monkeypatch.setenv("ENVIRONMENT", environment)
+    monkeypatch.setenv(variable, "set-by-azure")
+    with pytest.raises(ValidationError, match="Azure hosting"):
+        CoreSettings.load()

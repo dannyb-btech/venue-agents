@@ -14,6 +14,15 @@ from collections.abc import Iterable
 APP_ROLE = "va_app"
 """Group role for runtime logins: no LOGIN, no BYPASSRLS, owns nothing."""
 
+PROVISION_ROLE = "va_provision"
+"""Group role for the control plane in a stamp: creates tenants and venues only (ADR-0017)."""
+
+CATALOG_ROLE = "va_catalog"
+"""Group role for the control plane in the global catalog database (ADR-0017)."""
+
+GROUP_ROLES = (APP_ROLE, PROVISION_ROLE, CATALOG_ROLE)
+"""A runtime login belongs to exactly one of these (checked by `assert_rls_enforced`)."""
+
 POLICY_NAME = "tenant_isolation"
 TENANT_SETTING = "app.tenant_id"
 
@@ -42,6 +51,20 @@ END
 """
 
 DROP_CURRENT_TENANT_FN = "DROP FUNCTION va_current_tenant()"
+
+
+def create_group_role_sql(role: str) -> str:
+    """Create a NOLOGIN, NOBYPASSRLS group role if it doesn't exist (roles are cluster-wide)."""
+    role = _ident(role)
+    return f"""
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{role}') THEN
+        CREATE ROLE {role} NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+    END IF;
+END
+$$
+"""
 
 
 def _ident(name: str) -> str:

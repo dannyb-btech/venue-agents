@@ -30,6 +30,12 @@ class TenantContextError(VenueAgentsError):
     code = "tenant_context"
 
 
+class AuthenticationError(VenueAgentsError):
+    """No credential, or one that doesn't validate. Never echo the credential in the message."""
+
+    code = "unauthenticated"
+
+
 class AuthorizationError(VenueAgentsError):
     """The caller lacks the role or scope for this operation."""
 

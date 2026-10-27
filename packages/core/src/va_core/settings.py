@@ -47,7 +47,6 @@ class CoreSettings(BaseSettings):
     # Runtime connections log in as a member of `va_app` (no BYPASSRLS). The schema owner's URL
     # (DATABASE_ADMIN_URL) is deliberately not here: only `va_db.settings.MigrationSettings` has it.
     database_url: SecretStr | None = None
-    catalog_database_url: SecretStr | None = None
     database_connect_timeout: int = Field(default=10, gt=0)
 
     model_gateway_url: HttpUrl | None = None
@@ -63,15 +62,30 @@ class CoreSettings(BaseSettings):
     http_connect_timeout: float = Field(default=5.0, gt=0)
     http_read_timeout: float = Field(default=30.0, gt=0)
 
+    # Set by Azure hosting (Container Apps, App Service, managed identity endpoint). Used only to
+    # refuse ENVIRONMENT=local/test on Azure, which would switch off every deployed-only guard.
+    container_app_name: str | None = None
+    website_site_name: str | None = None
+    identity_endpoint: str | None = None
+
     @classmethod
     def load(cls) -> Self:
         """Load from the environment and `.env`. Fails if ENVIRONMENT is not set."""
         # Pyright sees env-sourced required fields as missing constructor arguments.
         return cls()  # pyright: ignore[reportCallIssue]
 
+    @property
+    def hosted_in_azure(self) -> bool:
+        return any((self.container_app_name, self.website_site_name, self.identity_endpoint))
+
     @model_validator(mode="after")
     def _require_azure_settings_when_deployed(self) -> Self:
         if self.environment.is_local:
+            if self.hosted_in_azure:
+                raise ValueError(
+                    f"ENVIRONMENT={self.environment} is for developer machines and CI, "
+                    "but Azure hosting variables are set"
+                )
             return self
         missing = [
             name
