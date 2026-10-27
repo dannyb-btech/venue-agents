@@ -21,3 +21,4 @@ Create one with `/adr <title>`. Template: `0000-template.md`.
 | [0014](0014-zapier-make-for-long-tail-only.md) | Zapier/Make only for the long tail | Accepted |
 | [0015](0015-webflow-marketing-site.md) | Marketing site on Webflow | Proposed |
 | [0016](0016-direct-foundry-calls-local-dev-only.md) | Direct Foundry calls in local development only; deployed stamps use APIM | Accepted |
+| [0017](0017-control-plane-catalog-and-stamp-provisioning.md) | Control plane catalog (no RLS, `va_catalog`), `va_provision` in stamps, placement, Entra DB logins | Accepted |

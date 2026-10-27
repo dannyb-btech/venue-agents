@@ -3,6 +3,18 @@
 Things that cost time: library quirks, API gotchas, environment issues. Newest first.
 Format: date — area — what happened — what to do instead.
 
+- 2026-10-27 — uvicorn on Windows — plain `uvicorn` picks the Proactor loop on Windows (Selector only
+  with --reload/--workers), so psycopg async fails at start-up. Run the control plane with
+  `python -m va_control_plane serve` (asyncio.run with SelectorEventLoop).
+- 2026-10-27 — pytest hooks — `pytest_asyncio_loop_factories` only works from a conftest; it moved to the
+  root `conftest.py` so every package's async DB tests get the selector loop.
+- 2026-10-27 — SQLAlchemy URLs — `URL.set(password=None)` does not clear the password; build with
+  `URL.create(...)`. `Result.tuples()` is deprecated in 2.1 (iterate rows directly).
+- 2026-10-27 — Bash tool heredocs — heredocs containing apostrophes in Python text failed to parse
+  ("unexpected EOF"); write the content with the Write tool and splice it with a short script.
+- 2026-10-27 — Alembic — editing an unapplied-in-git migration after applying it locally leaves the
+  local DB behind (500 on new columns); downgrade base + upgrade head locally after such edits.
+
 - 2026-10-25 — Postgres on Windows — `localhost:5432` hung forever in psycopg (`alembic upgrade` sat in
   `wait_conn`): `localhost` tries `::1` first and compose publishes on `127.0.0.1` only; with a
   connect timeout it falls back after the timeout. Use `127.0.0.1` in URLs and always set

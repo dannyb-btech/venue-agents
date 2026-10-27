@@ -3,21 +3,39 @@
 ## Current state
 
 - **Phase:** 0 — Foundations (in progress)
-- **Last task done:** P0-03 Stamp database + RLS (commit on `dev`; not pushed)
-- **Next task:** P0-04 Control plane + tenant catalog (P0-05, P0-06, P0-11 also unblocked; P0-13 human).
-  Before P0-08/P0-09: security-review H1 (per-service DB roles + ADR) and H2 (approval bound to payload).
+- **Last task done:** P0-04 Control plane + tenant catalog (ADR-0017; commits on `dev`, not pushed)
+- **Next task:** P0-05 Platform API (P0-06, P0-11 also unblocked; P0-13 human). Before P0-05/P0-12: ADR on
+  edge routing + entitlement distribution (ADR-0017 follow-up). Before P0-08/P0-09: security-review H1
+  (per-service DB roles + ADR) and H2 (approval bound to payload).
 - **Blockers:** Toast access route for OR unknown; SevenRooms credentials not yet requested;
   no Azure subscription for this project yet (local development only until then)
-- **Local services:** `docker compose up -d` — Postgres (pgvector 0.8.7; `va_app` + `va_app_local` from
-  init.sql, volume recreated 2026-10-25), Azurite, DTS emulator v0.0.9 (dashboard http://localhost:8082).
-  DB tests need `DATABASE_ADMIN_URL` (127.0.0.1, not localhost) in `.env`.
-- **CI:** GitHub repo `dannyb-btech/venue-agents`; CI green on `dev` (all 5 jobs) at P0-03 `487ff4e`, 2026-10-25;
-  the isolation job runs tests/isolation + packages/db on Postgres (147 passed)
+- **Local services:** `docker compose up -d` — Postgres (pgvector 0.8.7; logins `va_app_local`,
+  `va_catalog_local`, `va_provision_local`), Azurite, DTS emulator v0.0.9 (dashboard http://localhost:8082).
+  DB tests need `DATABASE_ADMIN_URL` (127.0.0.1) in `.env`. Catalog: `CATALOG_ADMIN_URL`; local catalog has
+  stamp `canary-local` registered and one smoke-test tenant/venue.
+- **CI:** GitHub repo `dannyb-btech/venue-agents`; green on `dev` at P0-03; the isolation job now also runs
+  `apps/control-plane` db tests (not yet run on GitHub: push pending)
 - **Environment:** Windows, VS Code + Claude Code, uv 0.13.5 (Python 3.12.15), pnpm, Docker Desktop.
   Norton Web Shield intercepts HTTPS: see lessons.md
 - **Branches:** `main` (scaffold) and `dev` (work); humans merge to `main` and push
 
 ## Session log (newest first)
+
+### 2026-10-26/27 — P0-04 Control plane + tenant catalog
+- Decided with user (ADR-0017): catalog without RLS behind `va_catalog`; `va_provision` stamp role
+  (SELECT+INSERT tenant/venue, under RLS); local dev-token auth until P0-05; tenant's stamp else least-loaded;
+  Entra managed-identity DB logins via a connect-time password provider (azure-researcher checked Learn).
+- `va_db`: catalog models + Alembic tree (`alembic-catalog.ini`, `c0001`), stamp migration 0006,
+  `credentials.py` (Entra/secret providers, `check_deployed_tls`), `assert_rls_enforced(engine, role)` with
+  one-group-role check, `hide_parameters`, `temp_database(..., logins=)` + `temp_catalog`; root `conftest.py`
+  holds the Windows selector-loop hook. `CoreSettings` refuses local/test on Azure hosting.
+- `apps/control-plane`: placement, onboarding job (in-process retry, stale-job fencing, Idempotency-Key),
+  provisioner, FastAPI `/route`, `/venues`, retry, entitlements, `/stamps`; CLI `register-stamp`, `serve`.
+- Verified: ruff, format, pyright 0 errors, pytest 355 passed / 4 expected skips, isolation 160 passed,
+  non-DB CI subset 167 passed, gitleaks; mutation checks (tenant-stamp placement, routable statuses) bite;
+  manual run on local compose (onboard, route, entitlements, replay; logs carry venue only).
+- security-reviewer (no High) and architect-reviewer findings fixed or recorded in ADR-0017 follow-ups
+  (edge routing/entitlements ADR, P0-11 Entra/TLS/private networking checks, move-tenant, dedicated stamps).
 
 ### 2026-10-25 — P0-03 Stamp database + RLS
 - `va_db`: 15 tables (models + hand-written Alembic 0001–0005), composite `(tenant_id, id)` keys/FKs,

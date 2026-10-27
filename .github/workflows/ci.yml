@@ -51,8 +51,9 @@ jobs:
       - run: uv sync --locked
       - run: uv run pytest -q -m "not isolation and not db"
 
-  # Cross-tenant isolation tests (must always pass) and migration tests, against real Postgres.
-  # Each run creates its own database and a throwaway va_app login; `app` is only the admin.
+  # Cross-tenant isolation tests (must always pass), migration tests and the control plane's
+  # two-stamp onboarding tests, against real Postgres. Each test creates its own databases and
+  # throwaway logins; `app` is only the admin.
   isolation:
     runs-on: ubuntu-latest
     services:
@@ -76,7 +77,7 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: uv sync --locked
-      - run: uv run pytest tests/isolation packages/db -q -m "isolation or db"
+      - run: uv run pytest tests/isolation packages/db apps/control-plane -q -m "isolation or db"
 
   secret-scan:
     runs-on: ubuntu-latest

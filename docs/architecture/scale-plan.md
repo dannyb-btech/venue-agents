@@ -29,7 +29,7 @@ Sunday night / Monday morning roster and order runs hit Foundry rate limits firs
 ## Build now (phase 0)
 
 - [ ] tenant_id in every table's keys
-- [ ] Tenant catalog and venue → stamp routing from release one
+- [x] Tenant catalog and venue → stamp routing from release one (P0-04, ADR-0017)
 - [ ] Whole stamp in Bicep; two stamps early (canary + general)
 - [ ] venue_id on every log, trace, token count and cost record
 - [ ] Deployment rings, feature flags (App Configuration), entitlements in the catalog

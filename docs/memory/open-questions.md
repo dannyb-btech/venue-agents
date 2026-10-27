@@ -31,6 +31,12 @@ Questions for the founders/partners. Answer inline with date; turn decisions int
 - [ ] Azure Postgres runtime login: map each app's managed identity to a `va_app` member role
       (Entra auth on flexible server). Design in P0-11. Per-service roles are now a P0-08 prerequisite
       (security review H1): the Entra mapping should target those roles, not a shared `va_app`.
+- [ ] Edge routing and entitlement distribution (ADR-0017 follow-up; needed before P0-05/P0-12):
+      stamp claim in the token + Front Door rules, or per-stamp hostnames with a sign-in redirect?
+      Entitlements cached by stamp services (TTL) or pushed to a stamp table? Catalog HA/DR level?
+- [ ] Verify Entra DB logins on a real server (P0-11): Entra-mapped roles as members of NOLOGIN group
+      roles and NOBYPASSRLS; user-assigned identity OID mapping; `sslrootcert=system` against the
+      Azure chain (ICA rotation 2026). ADR-0017 records what is unverified.
 - [ ] Azure subscription for the project: pay-as-you-go (Claude on Foundry requires a paid subscription,
       not free trial, credit-only or CSP).
 

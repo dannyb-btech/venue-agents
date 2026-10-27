@@ -24,8 +24,20 @@ Tenant always comes from the token. No endpoint accepts tenant_id.
 
 ## Control plane (global)
 
-`GET /route` (venue → stamp, used by Front Door/edge), `POST /venues` (onboard: place on a stamp,
-create tenant in stamp), `POST /venues/{id}/move`, `POST /venues/{id}/offboard`, `GET /stamps` (capacity).
+Callers are services and operators with scoped bearer tokens (ADR-0017); Entra validation from P0-05,
+a local-only dev token before then.
+
+| Method | Path | Scope | Purpose |
+| --- | --- | --- | --- |
+| GET | `/route?venue_id=` | `route:read` | Venue → stamp at sign-in/bootstrap (cached or carried in the token, not per request); 404 unless active or suspended |
+| POST | `/venues` | `venues:write` | Onboard: place on a stamp, record in catalog, create tenant (if new) + venue in the stamp. `Idempotency-Key` header replays the first job. `status: failed` → retry |
+| POST | `/venues/{id}/onboarding/retry` | `venues:write` | Re-run the stamp step of the latest job (idempotent) |
+| GET | `/venues/{id}/entitlements` | `entitlements:read` | What the venue has bought |
+| GET | `/stamps` | `stamps:read` | Stamps with capacity and placed venues |
+
+Later: `POST /venues/{id}/move`, `POST /venues/{id}/offboard`. Stamps are registered with the CLI
+(`python -m va_control_plane register-stamp`), not the API. `tenant_id` in `POST /venues` names the
+tenant an operator is managing; it is never a tenant context for venue data.
 
 ## Connector MCP servers (per stamp, internal)
 

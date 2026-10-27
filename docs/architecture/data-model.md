@@ -36,10 +36,22 @@ secret_ref), `agent_config` (targets e.g. labour %, wine GP, approval rules, sch
 
 **Knowledge:** `document` (source, title, blob_ref), `chunk` (text, embedding vector, document_id).
 
-## Catalog DB (global)
+## Catalog DB (global, ADR-0017)
 
-`venue_directory` (venue_id, tenant_id, stamp_id, region, plan, status), `stamp`
-(id, region, capacity, ring, status), `entitlement`, `onboarding_job`, `move_job`.
+`stamp` (id, region, ring, capacity, status, non-secret connection details: db host/port/name,
+provision login, sslmode), `tenant_directory` (tenant_id → stamp_id, status),
+`venue_directory` (tenant_id, venue_id, stamp_id, region, plan, status; FK `(tenant_id, stamp_id)` →
+tenant_directory so a venue can't leave its tenant's stamp), `entitlement` (tenant_id, venue_id,
+entitlement, revoked_at), `onboarding_job` (status, attempts, error_code, idempotency_key, the
+provisioning inputs). `move_job`
+comes with the move-venue tool (phase 3).
+
+- No RLS: the catalog is cross-tenant by design. Only `va_catalog` members reach it: SELECT on
+  `stamp` (operators register stamps with the catalog owner login via the CLI), SELECT/INSERT/UPDATE
+  on the rest, no DELETE. No people or business data; the only names are onboarding inputs.
+- Venue status `provisioning` → `active` (→ `suspended` / `offboarding` / `offboarded`); only
+  `active` and `suspended` venues route.
+- Separate Alembic tree: `packages/db/alembic-catalog.ini` (`CATALOG_ADMIN_URL`), revisions `c0001`…
 
 ## Conventions
 
@@ -58,14 +70,18 @@ secret_ref), `agent_config` (targets e.g. labour %, wine GP, approval rules, sch
 - `tenant_id` defaults to `va_current_tenant()`, so code never passes it.
 - Roles: the migration/admin login owns the schema (locally a superuser, so it bypasses RLS — never used
   by runtime code). Runtime logins are members of `va_app` (NOLOGIN, NOBYPASSRLS, owns nothing).
-  `tenant` is SELECT-only (lifecycle is the control plane's); `tool_call`, `approval`, `usage_cost` are
+  `tenant` is SELECT-only for `va_app` (lifecycle is the control plane's, via `va_provision`); `tool_call`, `approval`, `usage_cost` are
   append-only; `action_log` has no DELETE. The admin URL lives only in `va_db.settings.MigrationSettings`.
 - Code uses `va_db.session.tenant_session(sessionmaker, ctx)` on an engine from `create_engine` /
   `create_runtime_engine`: the tenant is set at the start of every transaction, connections `RESET ALL`
   on return to the pool, and a statement guard rejects anything else touching `app.tenant_id`,
   `set_config`, roles, `search_path`, `RESET` or `DISCARD`. Services must call
   `assert_rls_enforced(engine)` at start-up (refuses logins that can reach a superuser/BYPASSRLS role,
-  own tables, or aren't `va_app` members).
+  own tables, or aren't members of exactly the expected group role).
 - `va_current_tenant()` is `BEGIN ATOMIC` with schema-qualified names (bound at creation).
+- `va_provision` (P0-04, ADR-0017): the control plane's stamp role, SELECT+INSERT on `tenant` and
+  `venue` only, still under RLS (it sets the new tenant with `tenant_session`). `assert_rls_enforced`
+  takes the expected role. In Azure every login is a managed identity (Entra token as the password,
+  via the runtime engine's password provider) mapped to a member of the group role.
 - Follow-ups before P0-08/P0-09: per-service roles (H1) and approval-to-content binding (H2); see the
   phase-0 task list.

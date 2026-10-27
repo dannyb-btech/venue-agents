@@ -37,11 +37,16 @@ Gate 1: OR data flowing (read-only) into the canary stamp.
     `RESET ALL`, statement guard, `assert_rls_enforced`). 143 isolation tests (per-table behaviour +
     catalog meta-tests) and migration round-trip/model-drift tests. Security review H1/H2 scheduled on P0-08/P0-09.
 
-- [ ] **P0-04 Control plane + tenant catalog** — deps: P0-03 — docs: scale-plan.md, ADR-0008
+- [x] **P0-04 Control plane + tenant catalog** — deps: P0-03 — docs: scale-plan.md, ADR-0008
   - `apps/control-plane`: catalog DB (venue_directory, stamp, entitlement, onboarding_job), `GET /route`,
     `POST /venues` (placement on a stamp + create tenant in the stamp DB), entitlements read API.
   - Accept: onboarding a venue creates catalog + stamp records; routing returns the right stamp; tests
     run with two local stamps (two DBs) to avoid single-stamp assumptions.
+  - Done 2026-10-27 (ADR-0017): catalog schema + own Alembic tree (`va_catalog`, no RLS), stamp migration
+    0006 `va_provision`, placement (tenant's stamp / least-loaded, advisory lock), onboarding job with
+    retry + Idempotency-Key, FastAPI API + `register-stamp`/`serve` CLI, Entra password-provider seam with
+    deployed TLS checks. Tests on one catalog + two stamp DBs; security + architect reviews addressed.
+  - **Before P0-05/P0-12:** ADR on edge routing and entitlement distribution (ADR-0017 follow-up).
 
 - [ ] **P0-05 Platform API skeleton** — deps: P0-03 — docs: api.md
   - FastAPI app: auth (Entra External ID token validation; dev-mode stub issuer for local), role checks,
