@@ -64,7 +64,7 @@ FACTORIES: dict[str, Factory] = {
         "tenant_id": t,
         "id": uuid7(),
         "run_id": r["agent_run"],
-        "tool": "gmail.search",
+        "tool": "gmail_search_threads",
         "category": "read",
         "status": "succeeded",
     },

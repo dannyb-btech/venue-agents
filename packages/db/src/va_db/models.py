@@ -38,6 +38,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from va_core.tenancy import Role
+from va_core.tools import ToolCategory
 from va_db.ids import uuid7
 
 # Plain alias, not a PEP 695 `type` statement, so SQLAlchemy resolves it inside Mapped[...].
@@ -121,13 +122,6 @@ class RunStatus(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
-
-
-class ToolCategory(StrEnum):
-    """Agent tools may only read or draft (ADR-0005). There is deliberately no `write`."""
-
-    READ = "read"
-    DRAFT = "draft"
 
 
 class ToolCallStatus(StrEnum):

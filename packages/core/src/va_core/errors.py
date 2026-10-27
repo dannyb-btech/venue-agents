@@ -36,6 +36,18 @@ class AuthenticationError(VenueAgentsError):
     code = "unauthenticated"
 
 
+class EnvelopeError(AuthenticationError):
+    """A run envelope is missing, malformed, expired or signed for another audience or stamp."""
+
+    code = "invalid_envelope"
+
+
+class ToolRegistrationError(VenueAgentsError):
+    """A connector tool breaks the registry rules (category, name, arguments). A start-up bug."""
+
+    code = "tool_registration"
+
+
 class AuthorizationError(VenueAgentsError):
     """The caller lacks the role or scope for this operation."""
 

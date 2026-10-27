@@ -1,7 +1,9 @@
 """Secrets interface: Key Vault in Azure, the `.env` file locally.
 
-Per-tenant credentials (OAuth refresh tokens, API keys) are named `t-<tenant_id>-<system>-<kind>`
-and read through `TenantSecrets`, which refuses any name that belongs to another tenant.
+Per-tenant secrets are named `t-<tenant_id>-<system>-<kind>`; a venue's connection credentials
+(OAuth refresh tokens, API keys) `t-<tenant_id>-<venue_id>-<system>-<kind>`, because each venue of a
+tenant can connect its own account (ADR-0018). Both are read through `TenantSecrets`, which refuses
+any name that belongs to another tenant.
 Secret values are `SecretStr` and never logged; errors name the secret, never its value.
 """
 
@@ -187,6 +189,16 @@ def tenant_secret_name(ctx: TenantContext, system: str, kind: str) -> str:
                 f"invalid secret name part {part!r}: lowercase letters, digits, dashes"
             )
     return validate_secret_name(f"t-{ctx.tenant_id}-{system}-{kind}")
+
+
+def venue_secret_name(ctx: TenantContext, system: str, kind: str) -> str:
+    """Name of a venue's connection secret, e.g. `t-<tenant_id>-<venue_id>-xero-refresh-token`."""
+    for part in (system, kind):
+        if not _NAME_PART.fullmatch(part):
+            raise ValueError(
+                f"invalid secret name part {part!r}: lowercase letters, digits, dashes"
+            )
+    return validate_secret_name(f"t-{ctx.tenant_id}-{ctx.venue_id}-{system}-{kind}")
 
 
 class TenantSecrets:

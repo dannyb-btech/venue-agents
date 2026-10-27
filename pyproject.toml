@@ -19,7 +19,14 @@ dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "pre-commit==4.7.0",
+    # Core's own tests cover the connector framework.
+    "va-core[mcp]",
+    # MCP test clients (also pulled in by mcp; pinned here because tests import it).
+    "httpx2==2.16.0",
 ]
+
+[tool.uv.sources]
+va-core = { workspace = true }
 
 [tool.ruff]
 target-version = "py312"
@@ -27,7 +34,7 @@ line-length = 100
 extend-exclude = ["apps/venue-app"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "S"]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "S", "SLF"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests use fake credentials on purpose; gitleaks still scans them for real ones.

@@ -16,6 +16,13 @@ dependencies = [
     "python-dotenv==1.2.4",
 ]
 
+[project.optional-dependencies]
+# Connector framework (`va_core.mcp`): connectors and the agent runtime depend on `va-core[mcp]`.
+mcp = [
+    "mcp==2.3.0",
+    "pyjwt==2.15.1",
+]
+
 [build-system]
 requires = ["uv_build>=0.13,<0.14"]
 build-backend = "uv_build"
