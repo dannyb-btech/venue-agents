@@ -9,7 +9,7 @@ manager approves. Decisions: `docs/adr/`.
 ```
                      Venue app (PWA)          Admin console
                             │                       │
-                    Azure Front Door (routes venue → stamp via catalog)
+        Azure Front Door → APIM (tenant claim → stamp, cached from catalog; ADR-0019)
                             │
         ┌──────── Global ───┴─────────────────────────────────────────┐
         │ Control plane: tenant catalog, onboarding, move-venue        │

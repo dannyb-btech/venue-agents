@@ -5,27 +5,32 @@ spec from which the venue app's client is generated.
 
 ## Platform API (per stamp)
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/me` | Current user, venue, roles |
-| GET/PATCH | `/venue/settings` | Targets, approval rules, notification prefs |
-| GET | `/connections` | Connection status per system |
-| POST | `/connections/{system}/oauth/start` | Begin OAuth; returns redirect URL |
-| GET | `/connections/{system}/oauth/callback` | Complete OAuth; store secret in Key Vault |
-| GET | `/drafts?status=pending` | Approvals inbox |
-| GET | `/drafts/{id}` | Draft with reasoning summary and sources |
-| POST | `/drafts/{id}/approve` | Approve (optional edited payload) → raises approval event |
-| POST | `/drafts/{id}/reject` | Reject with reason |
-| GET | `/runs`, `/runs/{id}` | Agent activity and traces summary |
-| GET | `/reports/hours-saved` | Weekly value report |
-| POST | `/webhooks/{system}` | Inbound webhooks (signature-verified) → Service Bus |
+Callers are venue users with an Entra External ID access token (ADR-0019). The tenant comes only from
+the token's tenant claim; venue-scoped endpoints need `X-Venue-Id`, authorised on every request
+against the user's `role_assignment`. Roles: any role reads; owner/manager/approver decide drafts;
+owner/manager connect systems.
 
-Tenant always comes from the token. No endpoint accepts tenant_id.
+| Method | Path | Venue header | Purpose |
+| --- | --- | --- | --- |
+| GET | `/me` | no | Current user and the venues they hold roles on |
+| GET | `/connections` | yes | Connection status per system (never secret names) |
+| POST | `/connections/{system}/oauth/start` | yes | Begin OAuth; returns the provider URL. State is single-use, 10 min |
+| POST | `/connections/{system}/oauth/callback` | yes | The venue app posts `{code, state}` after the provider redirects to it; refresh token stored as `venue_secret_name(ctx, system, "refresh-token")` |
+| GET | `/drafts?status=pending` | yes | Approvals inbox |
+| GET | `/drafts/{id}` | yes | Draft with reasoning, sources and `payload_sha256` |
+| POST | `/drafts/{id}/approve` | yes | `{shown_sha256, edited_payload?}`; 409 if the draft changed; records `approval.payload_sha256`, then publishes `approval.granted` |
+| POST | `/drafts/{id}/reject` | yes | Reject with reason |
+| POST | `/drafts/{id}/approval/publish` | yes | Re-send `approval.granted` (MessageId = approval id) after a failed publish |
+| GET | `/runs`, `/runs/{id}` | yes | Agent activity summary |
+
+Later: `GET/PATCH /venue/settings`, `GET /reports/hours-saved`, `POST /webhooks/{system}`.
+No endpoint accepts `tenant_id`. The OpenAPI document is committed at `apps/platform-api/openapi.json`
+(`uv run python -m va_platform_api openapi`).
 
 ## Control plane (global)
 
-Callers are services and operators with scoped bearer tokens (ADR-0017); Entra validation from P0-05,
-a local-only dev token before then.
+Callers are services and operators with scoped bearer tokens (ADR-0017); a local-only dev token until
+service identities are wired in P0-11.
 
 | Method | Path | Scope | Purpose |
 | --- | --- | --- | --- |
@@ -34,6 +39,7 @@ a local-only dev token before then.
 | POST | `/venues/{id}/onboarding/retry` | `venues:write` | Re-run the stamp step of the latest job (idempotent) |
 | GET | `/venues/{id}/entitlements` | `entitlements:read` | What the venue has bought |
 | GET | `/stamps` | `stamps:read` | Stamps with capacity and placed venues |
+| POST | `/venues/{id}/users` | `venues:write` | Add a venue user to the stamp (`oid`, role, venue or tenant-wide); idempotent (ADR-0019) |
 
 Later: `POST /venues/{id}/move`, `POST /venues/{id}/offboard`. Stamps are registered with the CLI
 (`python -m va_control_plane register-stamp`), not the API. `tenant_id` in `POST /venues` names the

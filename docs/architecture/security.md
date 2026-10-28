@@ -15,7 +15,10 @@ details, line-level payroll). AU-processing option via Bedrock AU (ADR-0013).
 
 ## Identity and secrets
 
-- Entra External ID for venue users; roles owner, manager, approver, viewer (server-enforced).
+- Entra External ID for venue users (ADR-0019): the access token carries our tenant ID as a custom
+  claim (keyed on the user's `oid`); roles owner, manager, approver, viewer live in the stamp's
+  `role_assignment` and are checked on every request. The venue is chosen with `X-Venue-Id` and
+  authorised against those roles; the tenant must exist on the stamp that serves the request.
 - Managed identities between services; RBAC; no keys where Entra auth exists.
 - Per-tenant OAuth tokens in Key Vault with minimum scopes; only the executor uses write scopes.
 

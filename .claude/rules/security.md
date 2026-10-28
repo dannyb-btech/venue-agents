@@ -2,7 +2,9 @@
 
 - Resolve the tenant once, at the edge (auth token → `TenantContext`), and pass the context object down.
   Never accept `tenant_id`/`venue_id` from a request body, query string, tool argument or model output.
-  Only exception: the control plane's operator/edge API, where IDs name the tenant or venue being
+  Venue users: the tenant comes only from the validated token's tenant claim; the venue may come from
+  the `X-Venue-Id` header as a selector, authorised every request against `role_assignment` (ADR-0019).
+  Only other exception: the control plane's operator/edge API, where IDs name the tenant or venue being
   managed or routed. Its stamp provisioner is the one place a `TenantContext` is built from catalog
   state, for a tenant it minted or validated, with `va_provision` rights only (ADR-0017).
 - Every DB session sets the tenant (`SET app.tenant_id`) before queries so RLS applies. A query that

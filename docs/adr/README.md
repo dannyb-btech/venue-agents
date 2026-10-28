@@ -23,3 +23,4 @@ Create one with `/adr <title>`. Template: `0000-template.md`.
 | [0016](0016-direct-foundry-calls-local-dev-only.md) | Direct Foundry calls in local development only; deployed stamps use APIM | Accepted |
 | [0017](0017-control-plane-catalog-and-stamp-provisioning.md) | Control plane catalog (no RLS, `va_catalog`), `va_provision` in stamps, placement, Entra DB logins | Accepted |
 | [0018](0018-run-envelopes-and-connector-framework.md) | Signed run envelopes (HS256 per stamp), connector framework, `<system>_<verb>_<noun>` tool names | Accepted |
+| [0019](0019-venue-user-identity-and-tenant-resolution.md) | Venue users: Entra External ID tokens with a tenant claim, roles in the stamp DB, venue selector authorised per request, one stamp until two | Accepted |
