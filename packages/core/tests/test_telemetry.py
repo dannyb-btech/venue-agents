@@ -171,3 +171,83 @@ def test_with_connection_string_uses_azure_monitor(
     )
     telemetry.configure_telemetry(settings)
     assert seen == ["InstrumentationKey=abc"]
+
+
+def test_distro_url_recording_instrumentations_are_off() -> None:
+    options = telemetry.instrumentation_options()
+    for name in ("azure_sdk", "fastapi", "httpx", "requests", "urllib", "urllib3"):
+        assert options[name] == {"enabled": False}
+
+
+class _Route:
+    path = "/drafts/{draft_id}/approve"
+
+
+async def _call(
+    middleware: telemetry.RequestTracingMiddleware, path: str, query: bytes = b""
+) -> list[telemetry.AsgiMessage]:
+    sent: list[telemetry.AsgiMessage] = []
+
+    async def receive() -> telemetry.AsgiMessage:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: telemetry.AsgiMessage) -> None:
+        sent.append(message)
+
+    scope: telemetry.AsgiScope = {
+        "type": "http",
+        "method": "POST",
+        "path": path,
+        "query_string": query,
+    }
+    await middleware(scope, receive, send)
+    return sent
+
+
+async def test_request_span_has_route_template_not_url(settings: CoreSettings) -> None:
+    exporter = InMemorySpanExporter()
+    tracer = telemetry.build_tracer_provider(settings, [exporter]).get_tracer("test")
+    ctx = TenantContext(tenant_id=uuid4(), venue_id=uuid4(), stamp_id="canary-local")
+
+    async def app(
+        scope: telemetry.AsgiScope, _receive: telemetry.AsgiReceive, send: telemetry.AsgiSend
+    ) -> None:
+        scope["route"] = _Route()
+        with tenant_scope(ctx):
+            telemetry.tag_current_span()
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"{}"})
+
+    middleware = telemetry.RequestTracingMiddleware(app, tracer)
+    draft = uuid4()
+    await _call(middleware, f"/drafts/{draft}/approve", b"code=SECRETCODE")
+
+    (span,) = exporter.get_finished_spans()
+    assert span.name == "POST /drafts/{draft_id}/approve"
+    attrs = dict(span.attributes or {})
+    assert attrs["http.route"] == "/drafts/{draft_id}/approve"
+    assert attrs["http.response.status_code"] == 200
+    assert attrs["venue_id"] == str(ctx.venue_id)
+    flat = repr(attrs) + span.name
+    assert "SECRETCODE" not in flat
+    assert str(draft) not in flat
+
+
+async def test_request_span_records_only_exception_type(settings: CoreSettings) -> None:
+    exporter = InMemorySpanExporter()
+    tracer = telemetry.build_tracer_provider(settings, [exporter]).get_tracer("test")
+
+    async def app(
+        _scope: telemetry.AsgiScope, _receive: telemetry.AsgiReceive, _send: telemetry.AsgiSend
+    ) -> None:
+        raise ValueError("guest jane@example.com said hello")
+
+    with pytest.raises(ValueError, match="jane"):
+        await _call(telemetry.RequestTracingMiddleware(app, tracer), "/nowhere")
+
+    (span,) = exporter.get_finished_spans()
+    assert span.name == "POST unmatched"
+    assert dict(span.attributes or {})["error.type"] == "ValueError"
+    assert span.status.status_code == trace.StatusCode.ERROR
+    assert span.status.description is None
+    assert not span.events

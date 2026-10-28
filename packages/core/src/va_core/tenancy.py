@@ -47,6 +47,20 @@ class TenantContext(BaseModel):
         return not self.roles.isdisjoint(roles)
 
 
+class TenantIdentity(BaseModel):
+    """A signed-in user's tenant before a venue is chosen (ADR-0019). Immutable.
+
+    Only for tenant-level reads such as the user's own venues and roles (`/me`). Everything that
+    touches venue data needs a `TenantContext`.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    tenant_id: UUID
+    stamp_id: str = Field(min_length=1)
+    user_id: str | None = None
+
+
 _tenant: ContextVar[TenantContext | None] = ContextVar("va_tenant", default=None)
 _run_id: ContextVar[str | None] = ContextVar("va_run_id", default=None)
 # Run IDs end up in logs and span attributes: keep them to safe characters (no log injection).

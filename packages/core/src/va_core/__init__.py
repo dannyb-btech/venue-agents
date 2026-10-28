@@ -15,6 +15,7 @@ from va_core.settings import CoreSettings, Environment, get_settings
 from va_core.tenancy import (
     Role,
     TenantContext,
+    TenantIdentity,
     current_run_id,
     current_tenant,
     current_tenant_or_none,
@@ -34,6 +35,7 @@ __all__ = [
     "SecretNotFoundError",
     "TenantContext",
     "TenantContextError",
+    "TenantIdentity",
     "UpstreamTimeoutError",
     "VenueAgentsError",
     "current_run_id",

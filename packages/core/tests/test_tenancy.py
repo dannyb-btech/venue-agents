@@ -8,6 +8,7 @@ from va_core import (
     Role,
     TenantContext,
     TenantContextError,
+    TenantIdentity,
     current_run_id,
     current_tenant,
     current_tenant_or_none,
@@ -136,3 +137,11 @@ def test_has_role() -> None:
     ctx = make_ctx(roles=frozenset({Role.APPROVER}))
     assert ctx.has_role(Role.APPROVER, Role.OWNER)
     assert not ctx.has_role(Role.OWNER)
+
+
+def test_tenant_identity_is_frozen_and_strict() -> None:
+    identity = TenantIdentity(tenant_id=uuid4(), stamp_id="canary-local", user_id="oid-1")
+    with pytest.raises(ValidationError):
+        identity.tenant_id = uuid4()  # pyright: ignore[reportAttributeAccessIssue]
+    with pytest.raises(ValidationError):
+        TenantIdentity(tenant_id=uuid4(), stamp_id="canary-local", venue_id=uuid4())  # pyright: ignore[reportCallIssue]

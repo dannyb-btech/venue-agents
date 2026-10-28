@@ -36,7 +36,7 @@ from sqlalchemy.pool import ConnectionPoolEntry, PoolResetState
 
 from va_core.errors import ConfigurationError, TenantContextError
 from va_core.settings import CoreSettings
-from va_core.tenancy import TenantContext
+from va_core.tenancy import TenantContext, TenantIdentity
 from va_db.rls import APP_ROLE, GROUP_ROLES
 
 PasswordProvider = Callable[[], Awaitable[SecretStr]]
@@ -209,16 +209,19 @@ async def assert_rls_enforced(engine: AsyncEngine, role: str = APP_ROLE) -> None
 
 @asynccontextmanager
 async def tenant_session(
-    sessionmaker: async_sessionmaker[AsyncSession], ctx: TenantContext
+    sessionmaker: async_sessionmaker[AsyncSession], ctx: TenantContext | TenantIdentity
 ) -> AsyncGenerator[AsyncSession]:
     """A session whose every transaction runs as `ctx.tenant_id`.
+
+    `ctx` is a `TenantContext`, or a `TenantIdentity` for tenant-level reads before a venue is
+    chosen (ADR-0019). Both are only ever built from an authenticated token or envelope.
 
     Work left in the session commits when the block exits normally and rolls back on error.
     Explicit `commit()` inside the block is allowed (e.g. record "pending" before an external
     call): every new transaction sets the tenant again.
     """
-    if not isinstance(ctx, TenantContext):  # pyright: ignore[reportUnnecessaryIsInstance]
-        raise TenantContextError("tenant_session requires a TenantContext")
+    if not isinstance(ctx, TenantContext | TenantIdentity):  # pyright: ignore[reportUnnecessaryIsInstance]
+        raise TenantContextError("tenant_session requires a TenantContext or TenantIdentity")
     tenant_id = str(ctx.tenant_id)
 
     def set_tenant(_session: Session, _tx: SessionTransaction, connection: Connection) -> None:
