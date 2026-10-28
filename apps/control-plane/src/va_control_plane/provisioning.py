@@ -14,16 +14,16 @@ from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
-from sqlalchemy import URL
+from sqlalchemy import URL, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from va_core.secrets import SecretStore
 from va_core.settings import Environment
-from va_core.tenancy import TenantContext
+from va_core.tenancy import Role, TenantContext
 from va_db.catalog.models import SslMode, Stamp
 from va_db.credentials import ENTRA_POOL_RECYCLE_SECONDS, SecretPassword, check_deployed_tls
-from va_db.models import Tenant, Venue
+from va_db.models import AppUser, RoleAssignment, Tenant, Venue
 from va_db.rls import PROVISION_ROLE
 from va_db.session import (
     PasswordProvider,
@@ -82,9 +82,29 @@ class ProvisionRequest:
     timezone: str
 
 
+@dataclass(frozen=True)
+class UserGrant:
+    """Add a venue user (ADR-0019): `external_subject` is their Entra `oid`.
+
+    `tenant_wide` grants the role on every venue of the tenant (role_assignment.venue_id NULL).
+    """
+
+    tenant_id: UUID
+    venue_id: UUID
+    external_subject: str
+    email: str | None
+    display_name: str | None
+    role: Role
+    tenant_wide: bool = False
+
+
 class StampProvisioner(Protocol):
     async def provision(self, stamp: StampConnection, request: ProvisionRequest) -> None:
         """Create the tenant (if new) and venue. Idempotent: rows that exist are left alone."""
+        ...
+
+    async def add_user(self, stamp: StampConnection, grant: UserGrant) -> UUID:
+        """Create the user (if new) and the role assignment. Idempotent. Returns the user ID."""
         ...
 
     async def aclose(self) -> None: ...
@@ -175,6 +195,41 @@ class DatabaseStampProvisioner:
                 )
                 .on_conflict_do_nothing(index_elements=["tenant_id", "id"])
             )
+
+    async def add_user(self, stamp: StampConnection, grant: UserGrant) -> UUID:
+        """Existing users keep their name and email: va_provision has no UPDATE (migration 0009)."""
+        sessions = await self._sessions(stamp)
+        ctx = TenantContext(
+            tenant_id=grant.tenant_id,
+            venue_id=grant.venue_id,
+            stamp_id=stamp.stamp_id,
+            user_id=CONTROL_PLANE_USER,
+        )
+        async with tenant_session(sessions, ctx) as session:
+            await session.execute(
+                insert(AppUser)
+                .values(
+                    external_subject=grant.external_subject,
+                    email=grant.email,
+                    display_name=grant.display_name,
+                )
+                .on_conflict_do_nothing(index_elements=["tenant_id", "external_subject"])
+            )
+            user_id = await session.scalar(
+                select(AppUser.id).where(AppUser.external_subject == grant.external_subject)
+            )
+            if user_id is None:  # pragma: no cover - the insert above guarantees a row
+                raise RuntimeError("user row missing after insert")
+            await session.execute(
+                insert(RoleAssignment)
+                .values(
+                    user_id=user_id,
+                    venue_id=None if grant.tenant_wide else grant.venue_id,
+                    role=grant.role.value,
+                )
+                .on_conflict_do_nothing()
+            )
+        return user_id
 
     async def aclose(self) -> None:
         async with self._lock:

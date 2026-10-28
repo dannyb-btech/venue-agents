@@ -26,17 +26,21 @@ from va_control_plane.onboarding import (
 )
 from va_control_plane.provisioning import (
     DatabaseStampProvisioner,
+    StampConnection,
     StampProvisioner,
+    UserGrant,
     entra_password,
     local_password,
 )
 from va_control_plane.schemas import (
+    AddUserIn,
     EntitlementsOut,
     ErrorOut,
     OnboardingOut,
     OnboardVenueIn,
     RouteOut,
     StampOut,
+    UserOut,
 )
 from va_control_plane.settings import ControlPlaneSettings
 from va_core.errors import (
@@ -209,6 +213,39 @@ def create_app(
         _caller: Annotated[Caller, Depends(require(Scope.VENUES_WRITE))],
     ) -> OnboardingOut:
         return _out(await onboarding.retry(venue_id))
+
+    @app.post(
+        "/venues/{venue_id}/users",
+        response_model=UserOut,
+        status_code=status.HTTP_201_CREATED,
+        responses=responses,
+    )
+    async def add_user(
+        venue_id: UUID,
+        body: AddUserIn,
+        _caller: Annotated[Caller, Depends(require(Scope.VENUES_WRITE))],
+    ) -> UserOut:
+        """Add a user with a role on this venue (or tenant-wide) in the venue's stamp.
+
+        Idempotent: an existing user (same `external_subject`) keeps their name and email.
+        """
+        async with sessions() as session:
+            placed = await catalog.active_venue(session, venue_id)
+        user_id = await provisioner.add_user(
+            StampConnection.from_stamp(placed.stamp),
+            UserGrant(
+                tenant_id=placed.tenant_id,
+                venue_id=placed.venue_id,
+                external_subject=body.external_subject,
+                email=body.email,
+                display_name=body.display_name,
+                role=body.role,
+                tenant_wide=body.tenant_wide,
+            ),
+        )
+        return UserOut(
+            user_id=user_id, venue_id=venue_id, role=body.role, tenant_wide=body.tenant_wide
+        )
 
     @app.get("/venues/{venue_id}/entitlements", response_model=EntitlementsOut, responses=responses)
     async def get_entitlements(

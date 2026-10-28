@@ -15,6 +15,7 @@ from pydantic import (
     model_validator,
 )
 
+from va_core.tenancy import Role
 from va_db.catalog.models import STAMP_ID_PATTERN, DirectoryStatus, JobStatus, Ring, StampStatus
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -59,6 +60,27 @@ class OnboardVenueIn(_Body):
         if (self.tenant_id is None) == (self.tenant_name is None):
             raise ValueError("give exactly one of tenant_id (existing) and tenant_name (new)")
         return self
+
+
+class AddUserIn(_Body):
+    """Add a venue user to the venue's stamp (ADR-0019). The person must also exist in Entra
+    External ID with our tenant ID in their tenant attribute; this endpoint doesn't touch Entra."""
+
+    external_subject: Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9-]{1,64}$")] = Field(
+        description="The user's Entra object ID (`oid`)"
+    )
+    email: Annotated[str, StringConstraints(max_length=320)] | None = None
+    display_name: Name | None = None
+    role: Role
+    tenant_wide: bool = False
+    """Grant the role on every venue of the tenant, not just this one."""
+
+
+class UserOut(_Body):
+    user_id: UUID
+    venue_id: UUID
+    role: Role
+    tenant_wide: bool
 
 
 class OnboardingOut(_Body):

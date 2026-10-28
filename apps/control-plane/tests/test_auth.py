@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from pathlib import Path
+from uuid import UUID
 
 import httpx
 import pytest
@@ -19,7 +20,7 @@ from va_control_plane.auth import (
     Scope,
     build_authenticator,
 )
-from va_control_plane.provisioning import ProvisionRequest, StampConnection
+from va_control_plane.provisioning import ProvisionRequest, StampConnection, UserGrant
 from va_control_plane.settings import ControlPlaneSettings
 from va_core.errors import AuthenticationError, ConfigurationError
 from va_core.settings import Environment
@@ -32,11 +33,15 @@ ENDPOINTS = [
     ("GET", "/stamps"),
     ("POST", "/venues"),
     ("POST", f"/venues/{VENUE}/onboarding/retry"),
+    ("POST", f"/venues/{VENUE}/users"),
 ]
 
 
 class NoProvisioner:
     async def provision(self, stamp: StampConnection, request: ProvisionRequest) -> None:
+        raise AssertionError("not reached")
+
+    async def add_user(self, stamp: StampConnection, grant: UserGrant) -> UUID:
         raise AssertionError("not reached")
 
     async def aclose(self) -> None:

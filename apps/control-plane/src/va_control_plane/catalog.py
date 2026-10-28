@@ -54,6 +54,31 @@ async def route(session: AsyncSession, venue_id: UUID) -> Route:
     )
 
 
+@dataclass(frozen=True)
+class PlacedVenue:
+    tenant_id: UUID
+    venue_id: UUID
+    stamp: Stamp
+
+
+async def active_venue(session: AsyncSession, venue_id: UUID) -> PlacedVenue:
+    """An active venue with its tenant and stamp, for operator actions inside the stamp."""
+    row = (
+        await session.execute(
+            select(VenueDirectory, Stamp)
+            .join(Stamp, Stamp.id == VenueDirectory.stamp_id)
+            .where(
+                VenueDirectory.venue_id == venue_id,
+                VenueDirectory.status == DirectoryStatus.ACTIVE,
+            )
+        )
+    ).one_or_none()
+    if row is None:
+        raise NotFoundError("no active venue with this ID")
+    venue, stamp = row
+    return PlacedVenue(tenant_id=venue.tenant_id, venue_id=venue.venue_id, stamp=stamp)
+
+
 async def entitlements(session: AsyncSession, venue_id: UUID) -> list[str]:
     venue = (
         await session.execute(select(VenueDirectory).where(VenueDirectory.venue_id == venue_id))

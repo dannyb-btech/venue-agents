@@ -26,6 +26,7 @@ from va_control_plane.provisioning import (
     ProvisionRequest,
     StampConnection,
     StampProvisioner,
+    UserGrant,
 )
 from va_core.errors import ConfigurationError
 from va_core.http import RetryPolicy
@@ -120,6 +121,9 @@ class Flaky:
             self.failures -= 1
             raise ConnectionError("stamp unreachable")
         await self.inner.provision(stamp, request)
+
+    async def add_user(self, stamp: StampConnection, grant: UserGrant) -> UUID:
+        return await self.inner.add_user(stamp, grant)
 
     async def aclose(self) -> None:
         await self.inner.aclose()
@@ -483,3 +487,52 @@ async def test_running_job_is_retried_only_once_stale(
     set_running("10 minutes")
     recovered = await client.post(f"/venues/{venue_id}/onboarding/retry")
     assert recovered.json()["status"] == "succeeded"
+
+
+# --- venue users (ADR-0019) ----------------------------------------------------------------------
+
+
+def _stamp_query(
+    world: World, stamp_id: str, sql: str, **params: object
+) -> list[tuple[object, ...]]:
+    with _admin(world.stamps[stamp_id]) as engine, engine.connect() as conn:
+        return [tuple(r) for r in conn.execute(text(sql), params)]
+
+
+async def test_add_user_creates_user_and_role_in_the_venues_stamp(
+    world: World, client: httpx.AsyncClient
+) -> None:
+    placed = (await client.post("/venues", json=_new())).json()
+    venue_id, stamp_id = placed["venue_id"], placed["stamp_id"]
+    other = next(s for s in world.stamps if s != stamp_id)
+    body = {"external_subject": "oid-123", "email": "gm@example.test", "role": "manager"}
+
+    first = await client.post(f"/venues/{venue_id}/users", json=body)
+    assert first.status_code == 201, first.text
+    again = await client.post(
+        f"/venues/{venue_id}/users", json={**body, "email": "new@example.test"}
+    )
+    assert again.json()["user_id"] == first.json()["user_id"]
+    owner = await client.post(
+        f"/venues/{venue_id}/users", json={**body, "role": "owner", "tenant_wide": True}
+    )
+    assert owner.status_code == 201
+
+    users = _stamp_query(world, stamp_id, "SELECT tenant_id, external_subject, email FROM app_user")
+    assert users == [(UUID(placed["tenant_id"]), "oid-123", "gm@example.test")]
+    roles = _stamp_query(
+        world, stamp_id, "SELECT venue_id, role FROM role_assignment ORDER BY role"
+    )
+    assert sorted(roles, key=str) == sorted([(UUID(venue_id), "manager"), (None, "owner")], key=str)
+    assert _stamp_query(world, other, "SELECT id FROM app_user") == []
+
+
+async def test_add_user_needs_an_active_venue(client: httpx.AsyncClient) -> None:
+    body = {"external_subject": "oid-1", "role": "viewer"}
+    unknown = await client.post("/venues/0193a000-0000-7000-8000-000000000000/users", json=body)
+    assert unknown.status_code == 404
+    bad = await client.post(
+        "/venues/0193a000-0000-7000-8000-000000000000/users",
+        json={**body, "tenant_id": "0193a000-0000-7000-8000-00000000000a"},
+    )
+    assert bad.status_code == 422
