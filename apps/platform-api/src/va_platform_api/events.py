@@ -1,9 +1,11 @@
-"""`approval.granted` events for the action executor (ADR-0006, ADR-0019).
+"""`approval.decided` events: the stamp's approvals topic (ADR-0006, ADR-0019).
 
-Published after the approval commits, with `MessageId` = approval id, so a re-send (after a failed
-publish, `POST /drafts/{id}/approval/publish`) is a duplicate Service Bus can drop and the executor
-ignores (idempotent on approval id, P0-09). The event names records; it carries no payload: the
-executor reads the draft and approval and checks `payload_sha256` itself.
+Published after the decision commits, with `MessageId` = approval id. Two subscriptions: the action
+executor (acts on `approved`) and the agent runtime (resumes the waiting orchestration, P0-08).
+The event is a pointer, not a source of truth: it carries no payload, and consumers re-read the
+draft and approval under RLS and check `payload_sha256` before acting. Consumers are idempotent on
+the approval id; Service Bus duplicate detection only trims re-sends inside its window. How a
+consumer trusts the event's tenant is a P0-08/P0-09 decision (phase file).
 """
 
 from __future__ import annotations
@@ -17,13 +19,18 @@ from azure.servicebus import ServiceBusMessage
 from azure.servicebus.aio import ServiceBusClient
 from pydantic import BaseModel, ConfigDict
 
-APPROVAL_GRANTED = "approval.granted"
+from va_db.models import Decision
+
+APPROVAL_DECIDED = "approval.decided"
+PUBLISH_TIMEOUT = 10.0
+"""Seconds before a publish counts as failed; the decision stands and can be re-sent."""
 
 
-class ApprovalGranted(BaseModel):
+class ApprovalDecided(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     approval_id: UUID
+    decision: Decision
     draft_id: UUID
     draft_type: str
     tenant_id: UUID
@@ -34,7 +41,7 @@ class ApprovalGranted(BaseModel):
 
 
 class ApprovalPublisher(Protocol):
-    async def publish(self, event: ApprovalGranted) -> None:
+    async def publish(self, event: ApprovalDecided) -> None:
         """Send the event. Raises on failure; the caller reports it, never retries blindly."""
         ...
 
@@ -45,10 +52,10 @@ class InMemoryPublisher:
     """Tests and local runs without the Service Bus emulator."""
 
     def __init__(self) -> None:
-        self.sent: list[ApprovalGranted] = []
+        self.sent: list[ApprovalDecided] = []
         self.fail = False
 
-    async def publish(self, event: ApprovalGranted) -> None:
+    async def publish(self, event: ApprovalDecided) -> None:
         if self.fail:
             raise ConnectionError("publish failed (test)")
         self.sent.append(event)
@@ -85,13 +92,13 @@ class ServiceBusApprovalPublisher:
         client = ServiceBusClient(fully_qualified_namespace=namespace, credential=credential)
         return cls(client, topic, credential)
 
-    async def publish(self, event: ApprovalGranted) -> None:
+    async def publish(self, event: ApprovalDecided) -> None:
         message = ServiceBusMessage(
             event.model_dump_json(),
             message_id=str(event.approval_id),
-            subject=APPROVAL_GRANTED,
+            subject=APPROVAL_DECIDED,
             content_type="application/json",
-            application_properties={"stamp_id": event.stamp_id},
+            application_properties={"stamp_id": event.stamp_id, "decision": event.decision.value},
         )
         async with self._client.get_topic_sender(topic_name=self._topic) as sender:
             await sender.send_messages(message)

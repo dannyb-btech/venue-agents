@@ -13,5 +13,5 @@ class ControlPlaneSettings(CoreSettings):
     # Only the control plane reaches the catalog (a va_catalog member; ADR-0017). Not in
     # CoreSettings, so no stamp service can be pointed at it.
     catalog_database_url: SecretStr | None = None
-    # Local/test only: a static bearer token standing in for Entra until P0-05.
+    # Local/test only: a static bearer token standing in for Entra service tokens (P0-11/P0-12).
     control_plane_dev_token: SecretStr | None = None

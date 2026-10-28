@@ -133,3 +133,40 @@ def test_approval_hash_is_required_for_approvals(
     else:
         with pytest.raises(DBAPIError, match="payload_sha256"):
             conn.execute(_APPROVAL, params)
+
+
+def test_a_draft_needs_an_approval_to_be_approved(conn: Connection, seeded: Seeded) -> None:
+    # The check is deferred to commit; IMMEDIATE runs it now, inside the rolled-back transaction.
+    conn.execute(text("SET CONSTRAINTS va_draft_approval_required IMMEDIATE"))
+    bare = _draft(conn, seeded)
+    with pytest.raises(DBAPIError, match="needs an approval"), conn.begin_nested():
+        _set_status(conn, bare, "approved")
+    with pytest.raises(DBAPIError, match="needs an approval"), conn.begin_nested():
+        _draft(conn, seeded, status="approved")
+
+    rejected = _draft(conn, seeded)
+    conn.execute(
+        _APPROVAL,
+        {
+            "id": uuid7(),
+            "d": rejected,
+            "u": seeded.a.refs["app_user"],
+            "decision": "rejected",
+            "h": None,
+        },
+    )
+    with pytest.raises(DBAPIError, match="needs an approval"), conn.begin_nested():
+        _set_status(conn, rejected, "approved")
+
+    approved = _draft(conn, seeded)
+    conn.execute(
+        _APPROVAL,
+        {
+            "id": uuid7(),
+            "d": approved,
+            "u": seeded.a.refs["app_user"],
+            "decision": "approved",
+            "h": _HASH,
+        },
+    )
+    _set_status(conn, approved, "approved")

@@ -75,9 +75,9 @@ class DecisionOut(_Out):
     approval_id: UUID
     status: DraftStatus
     payload_sha256: Sha256
-    event_published: bool | None = None
-    """Approvals only: False means the approval is recorded but the executor wasn't told yet;
-    call `POST /drafts/{id}/approval/publish`."""
+    event_published: bool
+    """False: the decision is recorded but `approval.decided` wasn't sent. For approvals, call
+    `POST /drafts/{id}/approval/publish`."""
 
 
 class ConnectionOut(_Out):

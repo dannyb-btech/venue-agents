@@ -123,12 +123,13 @@ Learn recommends `sslmode=verify-full`
   is one regional database: its availability matters for onboarding and sign-in, not (per 8) for
   every request.
 - Follow-up work:
-  - **ADR before P0-05/P0-12: edge routing and entitlement distribution.** Options: stamp ID claim in
+  - **Done in ADR-0019: edge routing and entitlement distribution.** Options: stamp ID claim in
     the token with Front Door routing by header/path; per-stamp hostnames with a redirect after a
     sign-in `/route` lookup; entitlements cached by stamp services with a TTL, or pushed into a stamp
     table on change. Include catalog availability (zone-redundant HA, geo replica).
-  - P0-05: Entra token validation and app roles mapped to the scopes; stamp callers get a `stamp_id`
-    claim, and `/route` / entitlements filter on it.
+  - P0-11/P0-12 (moved from P0-05, which covered venue users only, ADR-0019): Entra service tokens
+    with app roles mapped to the scopes; stamp callers get a `stamp_id` claim, and `/route` and
+    entitlements filter on it.
   - P0-11: Entra admin + `pgaadauth_create_principal_with_oid` per stamp in the pipeline; verify on a
     real server that Entra-mapped roles can be members of NOLOGIN group roles and stay NOBYPASSRLS,
     that user-assigned identity OID mapping works, and that `sslrootcert=system` validates the Azure

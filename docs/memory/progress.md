@@ -3,22 +3,57 @@
 ## Current state
 
 - **Phase:** 0 — Foundations (in progress)
-- **Last task done:** P0-06 Connector framework (ADR-0018; committed on `dev`, not pushed)
-- **Next task:** P0-05 Platform API (P0-11 also unblocked; P0-07 waits on P0-13 human access requests).
-  Before P0-05/P0-12: ADR on edge routing + entitlement distribution (ADR-0017 follow-up). Before
-  P0-08: H1 per-service roles (now incl. `va_connector`), envelope minting per MCP request, draft
-  idempotency key, MCP client on the handshake-era protocol (see phase file). Before P0-09: H2.
+- **Last task done:** P0-05 Platform API skeleton (ADR-0019; committed on `dev`, not pushed)
+- **Next task:** P0-11 (unblocked) or P0-08. P0-08 prereqs (phase file): H1 per-service roles incl.
+  the Platform API's matrix, trigger + `approval.decided` trust ADR, envelope minting per MCP request,
+  draft idempotency key, handshake-era MCP client. P0-10 can start (CORS/pagination items listed).
+  P0-07 waits on P0-13 human access requests.
 - **Blockers:** Toast access route for OR unknown; SevenRooms credentials not yet requested;
-  no Azure subscription for this project yet (local development only until then)
-- **Local services:** `docker compose up -d` — Postgres (pgvector 0.8.7; logins `va_app_local`,
-  `va_catalog_local`, `va_provision_local`), Azurite, DTS emulator v0.0.9 (dashboard http://localhost:8082).
-  DB tests need `DATABASE_ADMIN_URL` (127.0.0.1) in `.env`. Catalog: `CATALOG_ADMIN_URL`.
-- **CI:** GitHub repo `dannyb-btech/venue-agents`; green on `dev` at P0-06 (`ce823fe`, all 5 jobs, 2026-10-28)
+  no Azure subscription or Entra External ID tenant yet (local development only until then)
+- **Local services:** `docker compose up -d`; migrate stamp DB to 0010. Platform API locally:
+  `PLATFORM_DEV_TOKEN_KEY` + `PLATFORM_OAUTH_STATE_KEY` in `.env` (see `.env.example`).
+- **CI:** GitHub repo `dannyb-btech/venue-agents`; green on `dev` at P0-06 (`ce823fe`); P0-05 not pushed
 - **Environment:** Windows, VS Code + Claude Code, uv 0.13.5 (Python 3.12.15), pnpm, Docker Desktop.
   Norton Web Shield intercepts HTTPS: see lessons.md
 - **Branches:** `main` (scaffold) and `dev` (work); humans merge to `main` and push
 
 ## Session log (newest first)
+
+### 2026-10-28 — P0-05 Platform API skeleton
+- Decided with user (ADR-0019, after checking Microsoft's multitenant identity guidance):
+  - Entra External ID access token with our tenant ID as a custom-attribute claim. The claim is a
+    selector; the boundary is `app_user` membership under RLS.
+  - Roles live in `role_assignment`; `X-Venue-Id` is authorised every request.
+  - One stamp until two, then APIM routes by tenant.
+  - No outbox: publish after commit, plus re-send.
+  - H2 done here.
+- Built:
+  - `va_platform_api`: Entra/dev validators, access resolution, `/me`, drafts approve/reject/re-publish
+    (`payload_sha256` binding, edit registry), `approval.decided` events (Service Bus topic,
+    `executor`/`runtime` subscriptions), connections + OAuth scaffolding, runs, CLI, `openapi.json`.
+  - Control plane `POST /venues/{id}/users`.
+  - `va_core` `TenantIdentity`, `payloads`, `RequestTracingMiddleware` (P0-02 M1 closed).
+  - Migrations 0007–0010: approval hash, draft guard, approval-required trigger, `oauth_state`,
+    va_provision user grants.
+- Verified:
+  - ruff, format, pyright 0 errors; pytest 592 passed / 4 expected skips; isolation 208 passed; CI
+    non-DB subset 323 passed. The CI DB job now includes `apps/platform-api`.
+  - 8 mutation checks caught: role, tid, aud, stamp tenant, hash, venue access, state user binding,
+    edit registry.
+  - Manual run on local compose: onboard, add users, `/me`, viewer 403, owner approve publishes,
+    unknown tenant 403. Logs hold no tokens; uvicorn access log off.
+- Reviews:
+  - security: no High; M1 partly fixed with migration 0010.
+  - architect: event contract, emulator topic, timeout, `tenant_suspended`, ADR-0019 OAuth/trust
+    sections and docs drift fixed.
+  - The rest is recorded in the phase file (P0-08/09/10/11/12).
+- Open Lows, not yet scheduled:
+  - `add_user` can put one `oid` in two tenants, and returns 201 for a disabled user.
+  - Every role sees full draft content (restrict by draft type before payroll/roster drafts).
+  - `tenant_not_on_stamp` vs `not_a_user` reveals tenant existence.
+  - `oauth_state` has no purge.
+  - `/me` spans carry no tenant tag.
+  - The Service Bus emulator topic config is untested.
 
 ### 2026-10-28 — P0-06 Connector framework
 - Decided with user (ADR-0018): run envelopes are HS256 JWTs with a per-stamp key (`X-VA-Run-Envelope`,

@@ -311,7 +311,8 @@ class Draft(Base):
 
     A trigger (`va_draft_guard`, migration 0007) keeps identity columns fixed, freezes content once
     the draft leaves `pending`, and allows only pending -> approved/rejected/superseded and
-    approved -> executed/failed.
+    approved -> executed/failed. A deferred constraint trigger (`va_draft_approval_required`,
+    migration 0010) refuses `approved` at commit unless an approved, hashed `approval` exists.
     """
 
     __tablename__ = "draft"

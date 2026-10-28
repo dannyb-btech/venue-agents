@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 import pytest
+from sqlalchemy import text
 
 from va_core.payloads import payload_sha256
 from va_db.ids import uuid7
@@ -71,6 +72,24 @@ async def test_user_of_another_tenant_is_not_a_user_here(api: Api, world: World)
     response = await api.client.get("/me", headers=world.headers("owner", tenant=world.b))
     assert response.status_code == 403
     assert response.json()["code"] == "not_a_user"
+
+
+async def test_suspended_tenant_is_403(api: Api, world: World) -> None:
+    tenant_id = uuid7()
+    with world.admin.begin() as conn:
+        conn.execute(
+            text("INSERT INTO tenant (tenant_id, name, status) VALUES (:t, 'S', 'suspended')"),
+            {"t": tenant_id},
+        )
+        conn.execute(
+            text("INSERT INTO app_user (tenant_id, id, external_subject) VALUES (:t, :u, 'owner')"),
+            {"t": tenant_id, "u": uuid7()},
+        )
+    response = await api.client.get(
+        "/me", headers={"Authorization": f"Bearer {world.token('owner', tenant_id)}"}
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "tenant_suspended"
 
 
 async def test_disabled_user_is_403(api: Api, world: World) -> None:
@@ -195,7 +214,8 @@ async def test_a_draft_is_decided_once(api: Api, world: World) -> None:
     )
     assert again.status_code == 409
     assert again.json()["code"] == "draft_decided"
-    assert api.publisher.sent == []
+    (event,) = api.publisher.sent
+    assert event.decision == "rejected"
 
 
 async def test_edits_only_for_registered_types(api: Api, world: World) -> None:

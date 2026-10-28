@@ -11,9 +11,9 @@ Global: the catalog database (control plane).
 | Core DB | Postgres flexible server | Platform, synced business data, agent activity |
 | Vectors | pgvector (same server) | Embeddings of menus, past proposals, supplier docs, tasting notes |
 | Files | Blob (container per tenant) | Uploads, generated POs/rosters, Toast SFTP exports |
-| Secrets | Key Vault | OAuth refresh tokens and API keys per tenant per system |
+| Secrets | Key Vault | OAuth refresh tokens and API keys per venue connection (ADR-0018) |
 | Workflow state | Durable Task Scheduler | Orchestration checkpoints, approval waits |
-| Messaging | Service Bus | Webhooks, triggers, sync jobs |
+| Messaging | Service Bus | Webhooks, triggers, sync jobs, `approval.decided` events (`approvals` topic) |
 | Catalog | Postgres (global) | Venue → stamp, region, plan, entitlements |
 | Analytics | Central store (Fabric or replica) | Cross-venue reporting; no app query crosses venues |
 
@@ -27,11 +27,15 @@ secret_ref), `agent_config` (targets e.g. labour %, wine GP, approval rules, sch
 `pay_run_summary`. Each has `source_system`, `source_id`, `synced_at`, unique on
 `(tenant_id, source_system, source_id)`. Payroll kept summarised unless a task needs line level.
 
+**Connections:** `oauth_state` (venue, user, system, hash of a single-use state, expiry, used_at):
+an OAuth connect flow in progress (ADR-0019).
+
 **Sync state:** `sync_cursor` (tenant, system, stream, cursor, last_success_at, last_error).
 
 **Agent activity:** `agent_run` (agent, prompt_version, model, status, started/ended, cost),
-`tool_call`, `draft` (type, payload JSON, status, reasoning summary, sources), `approval`
-(user, decision, edits, reason, at), `action_log` (external_id, result, at), `usage_cost`
+`tool_call`, `draft` (type, payload JSON, status, reasoning summary, sources; frozen once decided by
+the `va_draft_guard` trigger), `approval` (user, decision, edits, reason, `payload_sha256` of what
+will be executed, at), `action_log` (external_id, result, at), `usage_cost`
 (tokens in/out/cached, cost, venue_id).
 
 **Knowledge:** `document` (source, title, blob_ref), `chunk` (text, embedding vector, document_id).
@@ -83,5 +87,12 @@ comes with the move-venue tool (phase 3).
   `venue` only, still under RLS (it sets the new tenant with `tenant_session`). `assert_rls_enforced`
   takes the expected role. In Azure every login is a managed identity (Entra token as the password,
   via the runtime engine's password provider) mapped to a member of the group role.
-- Follow-ups before P0-08/P0-09: per-service roles (H1) and approval-to-content binding (H2); see the
-  phase-0 task list.
+- `va_provision` also has SELECT+INSERT on `app_user` and `role_assignment` (0009): operators add venue
+  users through the control plane (ADR-0019).
+- Approval binding (0007, review H2): `approval.payload_sha256` is required for approvals; the
+  `va_draft_guard` trigger keeps draft identity columns fixed, freezes payload/reasoning/sources once
+  the draft leaves `pending`, allows only pending → approved/rejected/superseded and
+  approved → executed/failed, and refuses deleting decided drafts.
+- Follow-up before P0-08: per-service roles (H1); see the phase-0 task list.
+- Check constraints created before 0007 carry a doubled prefix (`ck_draft_ck_draft_status`): the
+  migrations passed full names through the naming convention. Leave them; new ones use `op.f()`.

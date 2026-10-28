@@ -63,6 +63,8 @@ prompts/               session kickoff prompts for each build step
 - Migrations (from P0-03): `uv run alembic -c packages/db/alembic.ini upgrade head`; catalog (P0-04):
   `uv run alembic -c packages/db/alembic-catalog.ini upgrade head` (needs `CATALOG_ADMIN_URL`)
 - Control plane (from P0-04): `uv run python -m va_control_plane serve` · stamps: `... register-stamp --help`
+- Platform API (from P0-05): `uv run python -m va_platform_api serve` · local token: `... dev-token
+  --oid <oid> --tenant <uuid>` · OpenAPI: `... openapi > apps/platform-api/openapi.json`
 - Venue app (from P0-10): `pnpm --dir apps/venue-app dev`
 - Infra check (from P0-11): `az bicep build --file infra/bicep/main.bicep`
 - Packages are named `va-<name>` (import `va_<name>`). Branches: work on `dev`; `main` via human merge.

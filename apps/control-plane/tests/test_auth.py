@@ -97,7 +97,7 @@ def test_no_authenticator_outside_local_means_no_start() -> None:
         managed_identity_client_id="00000000-0000-0000-0000-000000000000",
         control_plane_dev_token=SecretStr(TOKEN),
     )
-    with pytest.raises(ConfigurationError, match="P0-05"):
+    with pytest.raises(ConfigurationError, match="P0-11/P0-12"):
         build_authenticator(settings)
 
 

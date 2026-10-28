@@ -33,9 +33,15 @@ Questions for the founders/partners. Answer inline with date; turn decisions int
 - [ ] Azure Postgres runtime login: map each app's managed identity to a `va_app` member role
       (Entra auth on flexible server). Design in P0-11. Per-service roles are now a P0-08 prerequisite
       (security review H1): the Entra mapping should target those roles, not a shared `va_app`.
-- [ ] Edge routing and entitlement distribution (ADR-0017 follow-up; needed before P0-05/P0-12):
-      stamp claim in the token + Front Door rules, or per-stamp hostnames with a sign-in redirect?
-      Entitlements cached by stamp services (TTL) or pushed to a stamp table? Catalog HA/DR level?
+- [x] Edge routing and entitlement distribution (ADR-0017 follow-up). 2026-10-28: ADR-0019 — tenant
+      claim in the Entra token, one stamp until two (then APIM tenant → stamp map, cached), stamp
+      services cache entitlements with a TTL (P0-12). Catalog HA/DR level still open (P0-11).
+- [ ] Does an External ID custom user attribute reach **access tokens** for the Platform API (claim
+      `va_tenant_id`)? Learn documents attributes in tokens but not explicitly for a custom API's
+      access token. Check on the first Entra tenant (P0-13); else use an `OnTokenIssuanceStart`
+      custom claims provider (ADR-0019). Also set `accessTokenAcceptedVersion: 2` on the API app.
+- [ ] Can one person need access to two customer organisations (e.g. a consultant or group ops
+      manager across separate tenants)? ADR-0019 supports one tenant per user for now.
 - [ ] Verify Entra DB logins on a real server (P0-11): Entra-mapped roles as members of NOLOGIN group
       roles and NOBYPASSRLS; user-assigned identity OID mapping; `sslrootcert=system` against the
       Azure chain (ICA rotation 2026). ADR-0017 records what is unverified.
@@ -52,3 +58,4 @@ Questions for the founders/partners. Answer inline with date; turn decisions int
 | Xero developer app | | | |
 | Tanda API app/token | | | |
 | Foundry Claude deployments (dev) | | | |
+| Entra External ID tenant (venue sign-in) | | | |

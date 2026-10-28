@@ -5,6 +5,7 @@ Write each runbook when its task introduces the failure mode. Format: symptoms, 
 
 | Runbook | Written in task |
 | --- | --- |
+| [Add a venue user (pilot)](add-venue-user.md) | P0-05 |
 | OAuth token expired / revoked for a venue connection | P0-14 |
 | Sync worker failing or falling behind | P0-14 |
 | Bad draft sent to a client or supplier | P1-09 |

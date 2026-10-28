@@ -18,9 +18,9 @@ owner/manager connect systems.
 | POST | `/connections/{system}/oauth/callback` | yes | The venue app posts `{code, state}` after the provider redirects to it; refresh token stored as `venue_secret_name(ctx, system, "refresh-token")` |
 | GET | `/drafts?status=pending` | yes | Approvals inbox |
 | GET | `/drafts/{id}` | yes | Draft with reasoning, sources and `payload_sha256` |
-| POST | `/drafts/{id}/approve` | yes | `{shown_sha256, edited_payload?}`; 409 if the draft changed; records `approval.payload_sha256`, then publishes `approval.granted` |
-| POST | `/drafts/{id}/reject` | yes | Reject with reason |
-| POST | `/drafts/{id}/approval/publish` | yes | Re-send `approval.granted` (MessageId = approval id) after a failed publish |
+| POST | `/drafts/{id}/approve` | yes | `{shown_sha256, edited_payload?}`; 409 if the draft changed; records `approval.payload_sha256`, then publishes `approval.decided` |
+| POST | `/drafts/{id}/reject` | yes | `{shown_sha256, reason}`; publishes `approval.decided` (rejected) so the waiting run ends |
+| POST | `/drafts/{id}/approval/publish` | yes | Re-send `approval.decided` (MessageId = approval id) after a failed publish |
 | GET | `/runs`, `/runs/{id}` | yes | Agent activity summary |
 
 Later: `GET/PATCH /venue/settings`, `GET /reports/hours-saved`, `POST /webhooks/{system}`.
@@ -61,7 +61,9 @@ for that connector, ≤ 10 min); tools never take a tenant argument. Stateless s
 
 - **Agent runtime:** started by Service Bus messages and schedules; no public endpoint.
 - **Sync workers:** Container Apps jobs (scheduled and event-driven).
-- **Action executor:** consumes `approval.granted` events; the only service with write scopes.
+- **Approvals topic** (`approvals`): `approval.decided` events, subscriptions `executor` and `runtime`.
+  Events are pointers: consumers re-read the approval under RLS and are idempotent on its ID.
+- **Action executor:** acts on approved decisions; the only service with write scopes.
 
 ## Model access
 

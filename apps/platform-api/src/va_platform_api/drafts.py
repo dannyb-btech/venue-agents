@@ -11,6 +11,7 @@ smuggle fields the executor would act on. None are registered yet; connector tas
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import UUID
@@ -31,7 +32,7 @@ from va_platform_api.errors import (
     EditNotSupportedError,
     UnprocessableError,
 )
-from va_platform_api.events import ApprovalGranted, ApprovalPublisher
+from va_platform_api.events import PUBLISH_TIMEOUT, ApprovalDecided, ApprovalPublisher
 
 logger = get_logger(__name__)
 
@@ -47,7 +48,7 @@ class Decided:
     approval_id: UUID
     status: DraftStatus
     payload_sha256: str
-    event_published: bool | None = None
+    event_published: bool
 
 
 def _validated_edit(
@@ -145,10 +146,13 @@ class DraftDecisions:
             session.add(approval)
             draft.status = DraftStatus.REJECTED.value
             await session.flush()
-        return Decided(draft.id, approval.id, DraftStatus.REJECTED, digest)
+            await session.refresh(approval, ["decided_at"])
+            event = _event(ctx, draft, approval, digest)
+        published = await self._publish(event)
+        return Decided(draft.id, approval.id, DraftStatus.REJECTED, digest, published)
 
     async def republish(self, ctx: TenantContext, draft_id: UUID) -> Decided:
-        """Re-send `approval.granted` for an approved draft the executor hasn't acted on."""
+        """Re-send `approval.decided` for an approved draft the executor hasn't acted on."""
         async with tenant_session(self._sessions, ctx) as session:
             row = (
                 await session.execute(
@@ -160,7 +164,11 @@ class DraftDecisions:
         if row is None:
             raise NotFoundError("no approval for this draft")
         draft, approval = row
-        if draft.status != DraftStatus.APPROVED or approval.payload_sha256 is None:
+        if (
+            draft.status != DraftStatus.APPROVED
+            or approval.decision != Decision.APPROVED
+            or approval.payload_sha256 is None
+        ):
             raise DraftDecidedError(f"draft is {draft.status}; nothing to publish")
         event = _event(ctx, draft, approval, approval.payload_sha256)
         published = await self._publish(event)
@@ -168,9 +176,10 @@ class DraftDecisions:
             draft.id, approval.id, DraftStatus.APPROVED, approval.payload_sha256, published
         )
 
-    async def _publish(self, event: ApprovalGranted) -> bool:
+    async def _publish(self, event: ApprovalDecided) -> bool:
         try:
-            await self._publisher.publish(event)
+            async with asyncio.timeout(PUBLISH_TIMEOUT):
+                await self._publisher.publish(event)
         except Exception as exc:
             logger.warning(
                 "approval event not published (%s); approval %s is recorded",
@@ -181,9 +190,10 @@ class DraftDecisions:
         return True
 
 
-def _event(ctx: TenantContext, draft: Draft, approval: Approval, digest: str) -> ApprovalGranted:
-    return ApprovalGranted(
+def _event(ctx: TenantContext, draft: Draft, approval: Approval, digest: str) -> ApprovalDecided:
+    return ApprovalDecided(
         approval_id=approval.id,
+        decision=Decision(approval.decision),
         draft_id=draft.id,
         draft_type=draft.type,
         tenant_id=ctx.tenant_id,

@@ -82,8 +82,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if settings.platform_dev_token_key is not None and args.host not in LOOPBACK:
         raise ConfigurationError("with PLATFORM_DEV_TOKEN_KEY set, serve on loopback only")
+    # No uvicorn access log: it prints raw paths and query strings outside the redaction filter.
+    # Requests are recorded by `RequestTracingMiddleware` (route templates only).
     config = uvicorn.Config(
-        "va_platform_api.api:app_from_settings", factory=True, host=args.host, port=args.port
+        "va_platform_api.api:app_from_settings",
+        factory=True,
+        host=args.host,
+        port=args.port,
+        access_log=False,
     )
     asyncio.run(uvicorn.Server(config).serve(), loop_factory=asyncio.SelectorEventLoop)
     return 0

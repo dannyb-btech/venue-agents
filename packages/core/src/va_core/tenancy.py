@@ -59,6 +59,8 @@ class TenantIdentity(BaseModel):
     tenant_id: UUID
     stamp_id: str = Field(min_length=1)
     user_id: str | None = None
+    """The identity provider's user ID (Entra `oid`), not `app_user.id`: the user row isn't
+    known yet. `TenantContext.user_id` holds `app_user.id`."""
 
 
 _tenant: ContextVar[TenantContext | None] = ContextVar("va_tenant", default=None)

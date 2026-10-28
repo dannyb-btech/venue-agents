@@ -3,6 +3,24 @@
 Things that cost time: library quirks, API gotchas, environment issues. Newest first.
 Format: date — area — what happened — what to do instead.
 
+- 2026-10-28 — Alembic naming convention — `env.py` passes `Base.metadata` (with a naming convention)
+  to migrations, so a full constraint name given to `op.create_check_constraint` / `sa.CheckConstraint`
+  is prefixed again (`ck_draft_ck_draft_status`). Wrap final names in `op.f()`. The model-drift test
+  doesn't compare check constraints, so it won't catch this.
+- 2026-10-28 — uvicorn access log — prints raw paths and query strings to stdout, outside the `va`
+  logger's redaction filter. Run services with `access_log=False`; `RequestTracingMiddleware` records
+  route templates instead. The Azure Monitor distro's FastAPI/httpx/requests/urllib instrumentations
+  record full URLs too: switched off in `va_core.telemetry.instrumentation_options()` (key = library
+  name, e.g. `{"fastapi": {"enabled": False}}`). The distro has no psycopg (v3) instrumentation.
+- 2026-10-28 — pyright on Windows — one full `uv run pyright` died with V8 "Fatal process out of
+  memory: Zone"; the rerun was clean (0 errors). Rerun before suspecting the code.
+- 2026-10-28 — PyJWT 2.15 — refuses to *mint* an HS256 token keyed with a JWK/PEM-looking secret, so
+  algorithm-confusion tests must build the token by hand (HMAC over header.body).
+- 2026-10-28 — local manual runs — the control plane reads stamp passwords only from the `.env` file
+  (`EnvFileSecretStore`), not process env; an older `.env` without
+  `STAMP_CANARY_LOCAL_PROVISION_DB_PASSWORD` makes onboarding fail with `secret_not_found`. For a clean
+  run, start services from a scratch folder holding its own `.env` (`uv run --project <repo> ...`).
+
 - 2026-10-28 — mcp 2.x — FastMCP is now `mcp.server.mcpserver.MCPServer`; `ServerMiddleware(ctx,
   call_next)` sees `ctx.method`, raw `ctx.params` and `ctx.request` (Starlette request). At that layer a
   `tools/list` result is a dict, and on the 2026-07-28 protocol `ttlMs`/`cacheScope` are required.

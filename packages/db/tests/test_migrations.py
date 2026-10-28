@@ -47,7 +47,18 @@ def test_upgrade_downgrade_upgrade(admin_url: str) -> None:
 
 def test_each_step_downgrades_cleanly(admin_url: str) -> None:
     with temp_database(admin_url, revision=None) as db:
-        for revision in ("0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009"):
+        for revision in (
+            "0001",
+            "0002",
+            "0003",
+            "0004",
+            "0005",
+            "0006",
+            "0007",
+            "0008",
+            "0009",
+            "0010",
+        ):
             migrate(db.admin_url, revision)
             migrate(db.admin_url, "-1", down=True)
             migrate(db.admin_url, revision)

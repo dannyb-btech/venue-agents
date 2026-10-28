@@ -9,6 +9,7 @@ Run locally: `uv run python -m va_platform_api serve --port 8091`.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -29,7 +30,13 @@ from va_core.errors import (
 )
 from va_core.payloads import payload_sha256
 from va_core.secrets import SecretStore, build_secret_store
-from va_core.telemetry import RequestTracingMiddleware, configure_telemetry, tag_current_span
+from va_core.telemetry import (
+    RequestTracingMiddleware,
+    configure_telemetry,
+    get_logger,
+    secure_handler,
+    tag_current_span,
+)
 from va_core.tenancy import Role, TenantContext, tenant_scope
 from va_db.credentials import ENTRA_POOL_RECYCLE_SECONDS, EntraTokenPassword, check_deployed_tls
 from va_db.models import (
@@ -74,6 +81,8 @@ from va_platform_api.schemas import (
     VenueOut,
 )
 from va_platform_api.settings import PlatformApiSettings
+
+logger = get_logger(__name__)
 
 VENUE_HEADER = "X-Venue-Id"
 SYSTEM_PATTERN = r"^[a-z][a-z0-9]{1,30}$"
@@ -204,12 +213,23 @@ def create_app(
     @app.exception_handler(VenueAgentsError)
     async def _handle(_request: Request, exc: VenueAgentsError) -> JSONResponse:
         code = next((s for t, s in _STATUS.items() if isinstance(exc, t)), 500)
+        if code >= 500:
+            logger.error("request failed (%s)", exc.code)
         message = exc.message if code < 500 else "internal error"
         headers = {"WWW-Authenticate": "Bearer"} if code == 401 else None
         return JSONResponse(
             ErrorOut(code=exc.code if code < 500 else "internal", message=message).model_dump(),
             status_code=code,
             headers=headers,
+        )
+
+    @app.exception_handler(Exception)
+    async def _unexpected(_request: Request, exc: Exception) -> JSONResponse:
+        # Type only: driver messages can carry row values (payloads, emails). Never re-raised to
+        # uvicorn, whose traceback would bypass the redaction filter.
+        logger.error("unhandled %s", type(exc).__name__)
+        return JSONResponse(
+            ErrorOut(code="internal", message="internal error").model_dump(), status_code=500
         )
 
     @app.get("/me", response_model=MeOut, responses=errors)
@@ -394,6 +414,10 @@ def app_from_settings() -> FastAPI:
     """Production wiring from settings (uvicorn `--factory`)."""
     settings = PlatformApiSettings.load()
     configure_telemetry(settings)
+    # uvicorn's own loggers sit outside the `va` tree: redact what they print as well.
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        for handler in logging.getLogger(name).handlers:
+            secure_handler(handler)
     validator = build_validator(settings)
     if settings.database_url is None:
         raise ConfigurationError("DATABASE_URL is not set")

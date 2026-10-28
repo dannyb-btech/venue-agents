@@ -2,8 +2,9 @@
 
 Callers are services and operators, not venue users: the edge (route lookups), stamp services
 (entitlements) and operators (onboarding). Each request needs a bearer token granting a scope.
-Until P0-05 brings Entra token validation, the only authenticator is a static dev token that is
-refused outside ENVIRONMENT=local/test, so a deployed control plane can't start without real auth.
+Until service identities are wired (P0-11/P0-12), the only authenticator is a static dev token
+that is refused outside ENVIRONMENT=local/test, so a deployed control plane can't start without
+real auth.
 """
 
 from __future__ import annotations
@@ -64,5 +65,5 @@ def build_authenticator(settings: ControlPlaneSettings) -> Authenticator:
         return DevTokenAuthenticator(settings.control_plane_dev_token, settings.environment)
     raise ConfigurationError(
         f"no control plane authenticator for ENVIRONMENT={settings.environment}: set "
-        "CONTROL_PLANE_DEV_TOKEN locally; Entra token validation arrives in P0-05"
+        "CONTROL_PLANE_DEV_TOKEN locally; Entra service tokens arrive with P0-11/P0-12"
     )

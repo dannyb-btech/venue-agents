@@ -62,6 +62,13 @@ must also run locally.
    automation comes later. If the attribute can't reach access tokens, the fallback is the
    `OnTokenIssuanceStart` claims provider emitting the same claim; the API doesn't change. The
    tenant comes only from this validated claim.
+   - **The claim is a selector, not the security boundary.** The boundary is §3: an active
+     `app_user` with this `oid` must exist inside that tenant, under RLS. A changed claim alone gets
+     403 `not_a_user`.
+   - **The attribute must not be user-editable:** it must not be collected in a sign-up flow and must
+     not be self-service editable.
+   - **One tenant per user is not enforced in the database** (`app_user` is unique per tenant). If an
+     operator adds one `oid` to two tenants, the claim picks which tenant applies.
 3. **Authorisation: in our database, per request.**
    - With the tenant set, the API loads the active `app_user` for `oid` and its `role_assignment`
      rows. A NULL venue in `role_assignment` means every venue of the tenant.
@@ -88,6 +95,33 @@ must also run locally.
    gains SELECT/INSERT on those two tables.
 9. **Local development:** a dev token issuer (HS256, same claims), refused outside
    `ENVIRONMENT=local/test` and on Azure hosting.
+10. **Connecting systems (OAuth authorization code + PKCE S256).**
+    - **Redirect:** the provider redirects to the **venue app**, which posts `{code, state}` to
+      `POST /connections/{system}/oauth/callback` with its bearer token. The tenant therefore still
+      comes from the token, and no unauthenticated callback endpoint exists.
+    - **State:** random and single use (an atomic `UPDATE … RETURNING`), valid for 10 minutes and
+      bound to the user, venue and system. Only its SHA-256 is stored, in `oauth_state` (RLS).
+    - **PKCE verifier:** HMAC-SHA256 of the state with the platform secret
+      `platform-oauth-state-key`, so no verifier is stored. Rotating the key fails only flows
+      started in the last 10 minutes.
+    - **Grant:** the refresh token is written once through `TenantSecrets` as
+      `venue_secret_name(ctx, system, "refresh-token")`, and the `connection` row points at it.
+    - **Holding, not using:** the API obtains grants but never reads them back or calls the vendor
+      with them; only `TenantCredentials` users refresh them (ADR-0018). A write-scoped grant (P0-09)
+      gets its own secret kind, and start/callback gain a `kind`.
+    - **Key Vault rights:** the API's Key Vault right should be **set-only** (a custom role with
+      `secrets/setSecret`, no get or list) on venue connection secrets. Its read of
+      `platform-oauth-state-key` is granted separately (P0-11).
+11. **Approval events.**
+    - **Event:** `approval.decided` (approved or rejected) goes to the stamp's `approvals` topic,
+      with subscriptions `executor` and `runtime`, after the decision commits, with `MessageId` =
+      approval id.
+    - **A pointer, not a source of truth:** no payload. Consumers re-read the approval and draft under
+      RLS, check `payload_sha256`, and are idempotent on approval id. Duplicate detection only trims
+      re-sends inside its window.
+    - **Trusting the tenant:** how a consumer trusts the event's tenant (Send RBAC limited to the API
+      identity plus the re-read, or a signed envelope as in ADR-0018) is decided with P0-08's
+      trigger-trust ADR.
 
 ## Options considered
 
@@ -99,6 +133,9 @@ must also run locally.
 | Roles as Entra app roles | No role tables to read | Role changes wait for a new token; customers can't manage roles in our app | Learn notes the flexibility cost |
 | Per-stamp hostnames with a sign-in lookup | Simple edge | Needs a user → tenant table outside RLS in each stamp | New non-negotiable exception |
 | Venue in every token (re-issue on switch) | No venue in requests | Needs our own issuer or per-venue claims; awkward switching | Not supported by the chosen IdP pattern |
+| OAuth callback as a server endpoint (GET redirect to the API) | Standard shape | The redirect carries no bearer token, so the tenant would come from state; cookie session needed | Tenant would come from request state |
+| Stored PKCE verifier | Conventional | A stored value that can complete a flow | The derived verifier stores nothing usable |
+| Transactional outbox for approval events | No lost events | Relay must read every tenant's outbox (cross-tenant role, an RLS exception) | Deferred; see consequences |
 
 ## Consequences
 
@@ -108,26 +145,46 @@ must also run locally.
   - Roles live in RLS-protected tables.
   - Every request is checked against the stamp's own data.
 - Bad / costs:
-  - Every request reads `app_user` and `role_assignment`: two small indexed queries.
+  - Per-request database cost: `resolve_member` runs four small queries in one transaction
+    (tenant, user, role assignments, the tenant's active venues), and each endpoint opens a second
+    transaction for its own work. That's fine for the pilot. At scale, load only the requested
+    venue, use one joined query and one session per request, or cache for a few seconds per
+    `(tenant, oid)` with the role-change delay stated.
   - The tenant attribute must be set correctly at invite. A wrong attribute yields 403s, not data
     exposure, because the user won't exist in that tenant.
   - Users in two customer organisations are not supported yet.
-  - Approval events are published after the approval commits, with no outbox. A failed publish
-    leaves the approval recorded and the response says so; `POST /drafts/{id}/approval/publish`
-    re-sends it, and the executor is idempotent on `approval_id`.
+  - Approval events are published after the decision commits (10 s timeout), with no outbox. A
+    failed publish leaves the decision recorded and the response says `event_published: false`;
+    `POST /drafts/{id}/approval/publish` re-sends it. Until a reconciler exists (P0-09), a lost
+    event needs a person to press re-send. A reconciler can't list tenants under forced RLS: it
+    needs the tenant list from the catalog, or a recorded exception. A late re-send can run an old
+    approval, so the executor needs a maximum approval age per draft type.
+  - The Platform API receives OAuth grants, including future write-scoped ones, and needs Key Vault
+    set rights. This bends non-negotiable 1 only as far as §10 allows: it holds a grant, never uses
+    it.
 - Follow-up work:
   - **P0-13 / first Entra tenant:**
     - confirm the custom attribute reaches access tokens for the API, otherwise switch to the claims
       provider;
     - set `accessTokenAcceptedVersion: 2`;
     - write the runbook for inviting a pilot user.
-  - **P0-11:** the API's Key Vault set rights for venue OAuth secrets.
+  - **P0-08:** event trust (with the trigger-trust ADR); the runtime subscription; per-service roles
+    (the API alone writes `app_user`/`role_assignment`/`approval`).
+  - **P0-09:** executor idempotency and maximum approval age; a reconciler for approved drafts with
+    no `action_log`; write-grant secret kind.
+  - **P0-11:**
+    - set-only Key Vault role for the API;
+    - an `approvals` topic with duplicate detection;
+    - Send rights for the API identity only;
+    - containers started with `python -m va_platform_api serve`, so the access log stays off.
   - **P0-12:** entitlement cache.
   - **Stamp #2:** APIM tenant → stamp routing.
   - **Later:** in-app invites via Graph, multi-tenant users (tenant selection), and an outbox if
     publish failures matter.
 
 ## Revisit when
+
+- Publish failures are seen, or a reconciler needs a cross-tenant read: consider an outbox.
 
 - A second stamp is built.
 - The tenant attribute can't reach access tokens.

@@ -1,6 +1,7 @@
 """From a validated token to what the caller may do, read from the stamp database (ADR-0019).
 
-1. The token's tenant must exist and be active on this stamp (else `tenant_not_on_stamp`).
+1. The token's tenant must exist on this stamp (else `tenant_not_on_stamp`) and be active (else
+   `tenant_suspended`). The tenant claim only selects the tenant; step 2 is the real check.
 2. The token's `oid` must be an active `app_user` of that tenant (else `not_a_user`).
 3. Roles come from `role_assignment`; a NULL venue means every venue of the tenant.
 4. Venue-scoped requests name a venue in `X-Venue-Id`; it must be active and the user must hold a
@@ -30,7 +31,7 @@ from va_db.models import (
 )
 from va_db.session import tenant_session
 from va_platform_api.auth import Principal
-from va_platform_api.errors import NotAUserError, TenantNotOnStampError
+from va_platform_api.errors import NotAUserError, TenantNotOnStampError, TenantSuspendedError
 
 
 @dataclass(frozen=True)
@@ -72,8 +73,10 @@ async def resolve_member(
     )
     async with tenant_session(sessions, identity) as session:
         tenant_status = await session.scalar(select(Tenant.status))
-        if tenant_status != TenantStatus.ACTIVE:
+        if tenant_status is None:
             raise TenantNotOnStampError("this tenant is not served here")
+        if tenant_status != TenantStatus.ACTIVE:
+            raise TenantSuspendedError("this organisation's access is suspended")
         user = await session.scalar(
             select(AppUser).where(AppUser.external_subject == principal.subject)
         )

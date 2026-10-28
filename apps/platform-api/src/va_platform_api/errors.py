@@ -6,9 +6,15 @@ from va_core.errors import AuthorizationError, VenueAgentsError
 
 
 class TenantNotOnStampError(AuthorizationError):
-    """The token's tenant doesn't live on this stamp, or isn't active (ADR-0019)."""
+    """The token's tenant doesn't live on this stamp (ADR-0019)."""
 
     code = "tenant_not_on_stamp"
+
+
+class TenantSuspendedError(AuthorizationError):
+    """The tenant exists here but is suspended or offboarding."""
+
+    code = "tenant_suspended"
 
 
 class NotAUserError(AuthorizationError):

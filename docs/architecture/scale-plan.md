@@ -7,7 +7,7 @@ plane routing each venue to its stamp (ADR-0008).
 
 | Layer | Scope | Design |
 | --- | --- | --- |
-| Edge routing | Global | Front Door routes each venue's requests to its stamp |
+| Edge routing | Global | Front Door → APIM; APIM validates the token and maps its tenant claim to the tenant's stamp (cached from the catalog). One stamp until two (ADR-0019) |
 | Control plane | Global | Tenant catalog (venue → stamp, region, plan, entitlements); onboarding, offboarding, move-venue workflows |
 | AI gateway | Global | APIM backend pool of Claude deployments across Foundry resources/regions; priority routing; circuit breakers honouring Retry-After; per-venue token limits |
 | App tier | Per stamp | Container Apps environment with all services |

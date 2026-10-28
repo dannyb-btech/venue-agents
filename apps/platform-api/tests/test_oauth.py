@@ -95,6 +95,12 @@ async def test_state_is_bound_to_user_and_venue(api: Api, world: World) -> None:
     assert await _callback(api, world, state) == 204
 
 
+async def test_another_user_on_the_same_venue_cannot_complete(api: Api, world: World) -> None:
+    state = await _start(api, world, oid="owner", venue="v2")
+    assert await _callback(api, world, state, oid="manager2", venue="v2") == 422
+    assert await _callback(api, world, state, oid="owner", venue="v2") == 204
+
+
 async def test_expired_state_is_refused(api: Api, world: World) -> None:
     state = await _start(api, world)
     with world.admin.begin() as conn:
