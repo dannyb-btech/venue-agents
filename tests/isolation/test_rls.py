@@ -95,8 +95,10 @@ def test_tenant_cannot_move_its_rows_to_another_tenant(seeded: Seeded, name: str
     with as_tenant(seeded.app, seeded.b.tenant_id) as conn:
         if not _can(conn, name, "UPDATE"):
             pytest.skip(f"app role has no UPDATE on {name}")
-        # The policy's WITH CHECK runs before FK/PK checks, so this is RLS rejecting it.
-        with pytest.raises(DBAPIError, match=RLS_VIOLATION):
+        # The policy's WITH CHECK runs before FK/PK checks, so this is RLS rejecting it. The
+        # draft guard trigger (0007) fires before the policy and refuses identity changes too.
+        expected = "identity columns are immutable" if name == "draft" else RLS_VIOLATION
+        with pytest.raises(DBAPIError, match=expected):
             conn.execute(table.update().values(tenant_id=seeded.a.tenant_id))
 
 

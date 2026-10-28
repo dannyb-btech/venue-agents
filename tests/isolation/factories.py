@@ -8,6 +8,7 @@ returns fresh unique values on every call.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -82,6 +83,16 @@ FACTORIES: dict[str, Factory] = {
         "draft_id": r["draft"],
         "user_id": r["app_user"],
         "decision": "approved",
+        "payload_sha256": "0" * 64,
+    },
+    "oauth_state": lambda t, r: {
+        "tenant_id": t,
+        "id": uuid7(),
+        "venue_id": r["venue"],
+        "user_id": r["app_user"],
+        "system": "gmail",
+        "state_sha256": uuid4().hex * 2,
+        "expires_at": datetime.now(UTC) + timedelta(minutes=10),
     },
     "action_log": lambda t, r: {
         "tenant_id": t,

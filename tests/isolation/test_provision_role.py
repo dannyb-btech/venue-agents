@@ -19,8 +19,13 @@ from va_db.ids import uuid7
 from va_db.rls import APP_ROLE, PROVISION_ROLE
 from va_db.session import assert_rls_enforced
 
-# Changing this is a security decision (ADR-0017): say why in the PR.
-EXPECTED_PRIVILEGES = {"tenant": {"SELECT", "INSERT"}, "venue": {"SELECT", "INSERT"}}
+# Changing this is a security decision (ADR-0017, ADR-0019 for users): say why in the PR.
+EXPECTED_PRIVILEGES = {
+    "tenant": {"SELECT", "INSERT"},
+    "venue": {"SELECT", "INSERT"},
+    "app_user": {"SELECT", "INSERT"},
+    "role_assignment": {"SELECT", "INSERT"},
+}
 
 _INSERT_TENANT = text("INSERT INTO tenant (tenant_id, name) VALUES (:t, 'New tenant')")
 _INSERT_VENUE = text("INSERT INTO venue (tenant_id, id, name) VALUES (:t, :v, 'New venue')")
@@ -109,10 +114,16 @@ def test_sees_only_the_session_tenant(seeded: Seeded) -> None:
         "DELETE FROM tenant",
         "UPDATE venue SET name = 'x'",
         "DELETE FROM venue",
-        "SELECT count(*) FROM app_user",
+        "UPDATE app_user SET status = 'disabled'",
+        "DELETE FROM app_user",
+        "UPDATE role_assignment SET role = 'owner'",
+        "DELETE FROM role_assignment",
         "SELECT count(*) FROM connection",
         "SELECT count(*) FROM draft",
-        "INSERT INTO role_assignment (user_id, role) VALUES (gen_random_uuid(), 'owner')",
+        "SELECT count(*) FROM approval",
+        "SELECT count(*) FROM oauth_state",
+        "INSERT INTO agent_run (venue_id, agent, prompt_version, model) "
+        "VALUES (gen_random_uuid(), 'x', 'v1', 'm')",
     ],
 )
 def test_cannot_touch_anything_else(seeded: Seeded, statement: str) -> None:
@@ -142,7 +153,8 @@ def test_no_column_grants_and_nothing_granted_to_public(seeded: Seeded) -> None:
         columns = conn.execute(
             text(
                 "SELECT table_name, column_name FROM information_schema.role_column_grants "
-                "WHERE grantee = :r AND table_name NOT IN ('tenant', 'venue')"
+                "WHERE grantee = :r "
+                "AND table_name NOT IN ('tenant', 'venue', 'app_user', 'role_assignment')"
             ),
             {"r": PROVISION_ROLE},
         ).all()
@@ -175,3 +187,35 @@ async def test_a_login_in_two_platform_roles_is_refused(seeded: Seeded) -> None:
         with seeded.admin.connect() as conn:
             conn.execute(text(f"DROP ROLE {login}"))
             conn.commit()
+
+
+_INSERT_USER = text(
+    "INSERT INTO app_user (tenant_id, id, external_subject) VALUES (:t, :u, :s) "
+    "ON CONFLICT (tenant_id, external_subject) DO NOTHING"
+)
+_INSERT_ROLE = text(
+    "INSERT INTO role_assignment (tenant_id, id, user_id, venue_id, role) "
+    "VALUES (:t, gen_random_uuid(), :u, :v, 'owner')"
+)
+
+
+def test_adds_users_and_roles_for_the_session_tenant_only(seeded: Seeded) -> None:
+    user = uuid7()
+    with as_tenant(seeded.provision, TENANT_A) as conn:
+        conn.execute(_INSERT_USER, {"t": TENANT_A, "u": user, "s": f"oid-{user}"})
+        conn.execute(_INSERT_ROLE, {"t": TENANT_A, "u": user, "v": seeded.a.refs["venue"]})
+        assert conn.execute(text("SELECT count(*) FROM role_assignment")).scalar_one() >= 1
+    with (
+        as_tenant(seeded.provision, TENANT_A) as conn,
+        pytest.raises(DBAPIError, match="row-level security"),
+    ):
+        conn.execute(_INSERT_USER, {"t": TENANT_B, "u": uuid7(), "s": "oid-other"})
+    with (
+        as_tenant(seeded.provision, TENANT_A) as conn,
+        pytest.raises(DBAPIError, match=r"row-level security|foreign key"),
+    ):
+        # Tenant B's user and venue are invisible, so the FK fails too.
+        conn.execute(
+            _INSERT_ROLE,
+            {"t": TENANT_B, "u": seeded.b.refs["app_user"], "v": seeded.b.refs["venue"]},
+        )

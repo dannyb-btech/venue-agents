@@ -25,6 +25,7 @@ EXPECTED_PRIVILEGES: dict[str, set[str]] = {
     "tool_call": _APPEND,
     "draft": _RW,
     "approval": _APPEND,
+    "oauth_state": {"SELECT", "INSERT", "UPDATE"},
     "action_log": {"SELECT", "INSERT", "UPDATE"},
     "usage_cost": _APPEND,
     "sync_cursor": _RW,

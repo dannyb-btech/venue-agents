@@ -307,7 +307,12 @@ class ToolCall(Base):
 
 
 class Draft(Base):
-    """Something an agent proposes. Only the action executor acts on it, after an approval."""
+    """Something an agent proposes. Only the action executor acts on it, after an approval.
+
+    A trigger (`va_draft_guard`, migration 0007) keeps identity columns fixed, freezes content once
+    the draft leaves `pending`, and allows only pending -> approved/rejected/superseded and
+    approved -> executed/failed.
+    """
 
     __tablename__ = "draft"
     __table_args__ = (
@@ -331,7 +336,11 @@ class Draft(Base):
 
 
 class Approval(Base):
-    """A human decision on a draft: one per draft, append-only (ADR-0006)."""
+    """A human decision on a draft: one per draft, append-only (ADR-0006).
+
+    `payload_sha256` binds an approval to what will be executed (`va_core.payloads`): the edited
+    payload (`edits`) if there is one, else the draft's. A rejection records the hash it was shown.
+    """
 
     __tablename__ = "approval"
     __table_args__ = (
@@ -339,6 +348,11 @@ class Approval(Base):
         _fk(("tenant_id", "user_id"), "app_user"),
         UniqueConstraint("tenant_id", "draft_id"),
         _check_in("decision", Decision),
+        CheckConstraint(
+            "payload_sha256 ~ '^[0-9a-f]{64}$' AND "
+            f"(decision <> '{Decision.APPROVED.value}' OR payload_sha256 IS NOT NULL)",
+            name="payload_sha256",
+        ),
     )
 
     tenant_id: Mapped[UUID] = _tenant_id()
@@ -348,7 +362,33 @@ class Approval(Base):
     decision: Mapped[str] = mapped_column(Text)
     edits: Mapped[JsonObject | None] = mapped_column(JSONB)
     reason: Mapped[str | None] = mapped_column(Text)
+    payload_sha256: Mapped[str | None] = mapped_column(Text)
     decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class OAuthState(Base):
+    """A started OAuth connection flow: single use, bound to its user, venue and system.
+
+    Only the state's hash is stored; the PKCE verifier is derived from the state (ADR-0019).
+    """
+
+    __tablename__ = "oauth_state"
+    __table_args__ = (
+        _fk(("tenant_id", "venue_id"), "venue", ondelete="CASCADE"),
+        _fk(("tenant_id", "user_id"), "app_user", ondelete="CASCADE"),
+        UniqueConstraint("tenant_id", "state_sha256"),
+        CheckConstraint("state_sha256 ~ '^[0-9a-f]{64}$'", name="state_sha256"),
+    )
+
+    tenant_id: Mapped[UUID] = _tenant_id()
+    id: Mapped[UUID] = _id()
+    venue_id: Mapped[UUID]
+    user_id: Mapped[UUID]
+    system: Mapped[str] = mapped_column(Text)
+    state_sha256: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created_at()
 
 
 class ActionLog(Base):
